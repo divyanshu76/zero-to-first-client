@@ -5,28 +5,29 @@ import { Plus, Target, Wrench, Flag } from "lucide-react";
 import { chapters, stages } from "@/data/chapters";
 
 export function ChapterList() {
-  const [open, setOpen] = useState<number[]>([1]);
+  const [open, setOpen] = useState<number[]>([]);
   const allOpen = open.length === chapters.length;
   const toggle = (n: number) => setOpen((o) => (o.includes(n) ? o.filter((x) => x !== n) : [...o, n]));
 
   return (
     <div>
-      <div className="mb-6 flex justify-end">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h3 className="text-xl font-bold text-ink sm:text-2xl">All ten chapters</h3>
         <button
           type="button"
           onClick={() => setOpen(allOpen ? [] : chapters.map((c) => c.number))}
-          className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-ink hover:bg-white"
+          className="press shrink-0 rounded-full border border-line-strong px-4 py-2 text-sm font-semibold text-ink hover:border-ink hover:bg-white"
         >
-          {allOpen ? "Collapse all" : "Expand all chapters"}
+          {allOpen ? "Collapse all" : "Expand all"}
         </button>
       </div>
 
-      <div className="space-y-12">
+      <div className="space-y-8">
         {stages.map((stage) => (
           <div key={stage.id}>
-            <div className="mb-4 flex items-baseline gap-3 border-b border-ink pb-3">
-              <span className="font-display text-xs font-bold tracking-[0.14em] text-violet uppercase">{stage.label}</span>
-              <h3 className="font-display text-lg font-bold text-ink">{stage.title}</h3>
+            <div className="mb-1 flex items-baseline gap-3 border-b border-ink pb-2.5">
+              <span className="font-display text-[0.8rem] font-bold text-violet">{stage.label}</span>
+              <h4 className="font-display text-base font-bold text-ink">{stage.title}</h4>
             </div>
             <ul className="divide-y divide-line">
               {chapters
@@ -37,20 +38,20 @@ export function ChapterList() {
                   const btnId = `chapter-btn-${c.number}`;
                   return (
                     <li key={c.number}>
-                      <h4>
+                      <h5>
                         <button
                           id={btnId}
                           type="button"
                           aria-expanded={isOpen}
                           aria-controls={panelId}
                           onClick={() => toggle(c.number)}
-                          className="group grid w-full grid-cols-[3.25rem_1fr_auto] items-start gap-4 py-6 text-left sm:grid-cols-[5rem_1fr_auto] sm:gap-6"
+                          className="group grid w-full grid-cols-[3.25rem_1fr_auto] items-start gap-4 py-4 text-left sm:grid-cols-[4.5rem_1fr_auto] sm:gap-6"
                         >
-                          <span className={`font-display text-3xl leading-none font-extrabold tabular-nums transition-colors sm:text-[2.6rem] ${isOpen ? "text-violet" : "text-[#8a857c] group-hover:text-ink-2"}`}>
+                          <span className={`font-display text-3xl leading-none font-extrabold tabular-nums transition-colors sm:text-[2.2rem] ${isOpen ? "text-violet" : "text-[#8a857c] group-hover:text-ink-2"}`}>
                             {String(c.number).padStart(2, "0")}
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-display text-xl font-bold text-ink sm:text-2xl">{c.title}</span>
+                            <span className="block font-display text-lg font-bold text-ink sm:text-xl">{c.title}</span>
                             <span className="mt-1.5 block text-[0.95rem] leading-snug text-ink-2">{c.hook}</span>
                           </span>
                           <span
@@ -62,7 +63,7 @@ export function ChapterList() {
                             <Plus className="size-4" />
                           </span>
                         </button>
-                      </h4>
+                      </h5>
                       <div
                         id={panelId}
                         role="region"
@@ -70,7 +71,7 @@ export function ChapterList() {
                         className={`grid transition-[grid-template-rows] duration-500 ease-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
                       >
                         <div className="overflow-hidden" inert={!isOpen}>
-                          <div className="grid gap-8 pb-10 sm:pl-[6.5rem] lg:grid-cols-[1.25fr_1fr] lg:gap-12">
+                          <div className="grid gap-8 pb-7 sm:pl-[6rem] lg:grid-cols-[1.25fr_1fr] lg:gap-12">
                             <div>
                               <p className="text-[1.02rem] leading-relaxed text-ink">{c.summary}</p>
                               <p className="mt-6 font-display text-sm font-bold text-ink">What you&apos;ll learn</p>

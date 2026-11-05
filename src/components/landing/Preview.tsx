@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 import { previews } from "@/data/content";
-import { Accent, SectionHeader } from "@/components/ui/SectionHeader";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 export function Preview() {
   const [index, setIndex] = useState<number | null>(null);
@@ -44,17 +44,16 @@ export function Preview() {
   const current = index !== null ? previews[index] : null;
 
   return (
-    <section aria-labelledby="preview-title" className="overflow-hidden border-t border-line bg-paper-2 py-24 lg:py-32">
+    <section id="preview" aria-labelledby="preview-title" className="scroll-mt-16 overflow-hidden border-t border-line bg-paper-2 py-16 lg:py-20">
       <div className="container-page">
         <SectionHeader
           id="preview-title"
-          eyebrow="Inside the ebook"
-          title={<>Look inside <Accent>before</Accent> you decide.</>}
+          title="Look inside before you buy"
           intro={`${previews.length} real pages from the 142-page PDF — enough to judge the format and depth without giving the whole book away. Tap any page to enlarge it.`}
         />
       </div>
 
-      <div className="mt-14">
+      <div className="mt-8">
         <ul
           className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [scrollbar-width:thin] sm:gap-6"
           aria-label="Ebook page previews"
@@ -70,7 +69,7 @@ export function Preview() {
                 className="group relative block w-full text-left"
               >
                 <span className="relative block aspect-[595/842] overflow-hidden rounded-lg border border-line bg-white shadow-[0_18px_40px_-24px_rgb(23_23_23/0.45)] transition-transform duration-300 group-hover:-translate-y-1">
-                  <Image src={p.src} alt="" fill sizes="(min-width: 1024px) 280px, (min-width: 640px) 40vw, 68vw" className="object-cover" />
+                  <Image src={p.src} alt="" fill sizes="(min-width: 1024px) 280px, (min-width: 640px) 40vw, 68vw" className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
                   <span className="absolute right-3 bottom-3 inline-flex size-8 items-center justify-center rounded-full bg-ink/80 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     <Expand aria-hidden className="size-3.5" />
                   </span>

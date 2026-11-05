@@ -28,9 +28,9 @@ export function BookMockup({ preload = false, className = "", sizes = "(min-widt
 
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 font-display text-[0.82rem] font-extrabold tracking-[0.14em] text-ink ${className}`}>
+    <span className={`inline-flex items-center gap-2 font-display text-[0.95rem] font-extrabold tracking-[0.04em] text-ink ${className}`}>
       <span aria-hidden className="size-2.5 rounded-[3px] bg-violet" />
-      DEADCODE LABS
+      CRAFT <span className="font-serif text-[1.1em] font-normal tracking-normal text-violet italic">&amp;</span> CODE
     </span>
   );
 }

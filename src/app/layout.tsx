@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Manrope, Instrument_Serif } from "next/font/google";
-import { product } from "@/data/product";
+import { brand, product } from "@/data/product";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
@@ -16,8 +16,9 @@ export const metadata: Metadata = {
   title: { default: title, template: `%s — ${product.displayName}` },
   description,
   applicationName: product.displayName,
-  authors: [{ name: product.publisher, url: product.publisherUrl }],
-  publisher: product.publisher,
+  authors: [{ name: brand.publisher, url: brand.publisherUrl }],
+  publisher: brand.seller,
+  creator: brand.publisher,
   keywords: [
     "AI business starter kit",
     "how to start freelancing with AI",
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/",
-    siteName: product.displayName,
+    siteName: `${product.displayName} by ${brand.seller}`,
     title,
     description,
     locale: "en_IN",

@@ -101,7 +101,7 @@ export function ThreeDEbookShowcase() {
 
   return (
     <figure className="relative mx-auto w-full" aria-label="ZERO TO FIRST CLIENT — 3D ebook preview">
-      <div ref={wrap} className="ztfc-book-stage relative mx-auto aspect-[5/6] w-full max-w-[19rem] sm:max-w-[26rem] lg:aspect-[9/10] lg:max-w-[32rem]">
+      <div ref={wrap} className="ztfc-book-stage relative mx-auto aspect-[5/6] w-full max-w-[18rem] sm:max-w-[24rem] lg:aspect-[9/10] lg:max-w-[31rem]">
         {/* Soft studio backdrop + violet ambient glow, outside the iframe so it can't block the scene. */}
         <div aria-hidden className="absolute inset-x-[4%] top-[6%] bottom-[4%] rounded-[2.5rem] bg-paper-2" />
         <div aria-hidden className="absolute top-[22%] left-1/2 size-[62%] -translate-x-1/2 rounded-full bg-violet/15 blur-3xl" />
@@ -129,18 +129,17 @@ export function ThreeDEbookShowcase() {
         ) : null}
       </div>
 
-      <figcaption className="mt-4 flex flex-col items-center gap-3 text-center">
-        <span className="font-display text-[0.68rem] font-bold tracking-[0.2em] text-violet uppercase">Your complete business starter kit</span>
-        <span className="text-[0.82rem] font-medium text-ink-2">142 Pages · 10 Chapters · 141 AI Prompts</span>
+      <figcaption className="mt-3 flex justify-center">
+        <span className="sr-only">The real ZERO TO FIRST CLIENT cover; it opens to the first interior pages of the ebook.</span>
         {ready ? (
           <button
             type="button"
             onClick={() => send("toggle")}
             aria-pressed={open}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong bg-white/70 px-5 font-display text-[0.85rem] font-semibold text-ink backdrop-blur transition-colors hover:border-ink hover:bg-white"
+            className="press inline-flex h-10 items-center gap-2 rounded-full border border-line-strong bg-white/70 px-5 font-display text-[0.85rem] font-semibold text-ink backdrop-blur hover:border-ink hover:bg-white"
           >
             {open ? <BookText aria-hidden className="size-4 text-violet" /> : <BookOpen aria-hidden className="size-4 text-violet" />}
-            {open ? "Close the book" : "Look inside"}
+            {open ? "Close the book" : "Open the book"}
           </button>
         ) : (
           <span aria-hidden className="h-10" />

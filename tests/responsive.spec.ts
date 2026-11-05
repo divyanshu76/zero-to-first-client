@@ -104,18 +104,18 @@ for (const c of [...devicesMatrix, ...zoomMatrix]) {
       if (c.mobile) expect(await page.evaluate(() => window.visualViewport?.scale ?? 1)).toBe(1);
 
       // The main content box should use the viewport: at least 80% of the width, or the 1280 px max.
-      const container = await page.locator("#overview .container-page").first().boundingBox();
+      const container = await page.locator("#inside .container-page").first().boundingBox();
       expect(container).not.toBeNull();
       expect(container!.width).toBeGreaterThanOrEqual(Math.min(report.width, 1280) * 0.8);
       expect(container!.x + container!.width).toBeLessThanOrEqual(report.width + 1);
 
       // Navigation: links inline from 1024 px, the menu button below that.
-      if (report.width >= 1024) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Chapters" })).toBeVisible();
+      if (report.width >= 1024) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "How it works" })).toBeVisible();
       else await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 
       // Hero CTAs are fully on screen and don't overlap.
-      const buy = await page.getByRole("button", { name: "Get Instant Access" }).boundingBox();
-      const explore = await page.getByRole("link", { name: /Explore What/ }).boundingBox();
+      const buy = await page.locator("#top").getByRole("button", { name: /get instant access/i }).boundingBox();
+      const explore = await page.locator("#top").getByRole("link", { name: /look inside the book/i }).boundingBox();
       for (const b of [buy, explore]) {
         expect(b).not.toBeNull();
         expect(b!.x).toBeGreaterThanOrEqual(0);
@@ -134,8 +134,8 @@ for (const c of [...devicesMatrix, ...zoomMatrix]) {
       expect(stage!.x).toBeGreaterThanOrEqual(-1);
       expect(stage!.x + stage!.width).toBeLessThanOrEqual(report.width + 1);
 
-      // All 14 main sections are present.
-      expect(await page.locator("main > section").count()).toBe(14);
+      // All 9 main sections are present.
+      expect(await page.locator("main > section").count()).toBe(9);
 
       await page.screenshot({ path: info.outputPath(`${c.name}.png`) });
     });
@@ -147,7 +147,7 @@ test("mobile menu opens, lists every section link and closes on Escape", async (
   await page.goto("/");
   await page.getByRole("button", { name: "Open menu" }).click();
   const menu = page.locator("#mobile-menu");
-  for (const name of ["Overview", "What's Inside", "Chapters", "Benefits", "FAQ"]) await expect(menu.getByRole("link", { name })).toBeVisible();
+  for (const name of ["What's inside", "Preview", "How it works", "Pricing", "FAQ"]) await expect(menu.getByRole("link", { name })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
 });
@@ -158,4 +158,51 @@ test("pinch-zoom is not disabled by the viewport meta tag", async ({ page }) => 
   expect(metas).toHaveLength(1);
   expect(metas[0]).toContain("width=device-width");
   expect(metas[0]).not.toMatch(/user-scalable\s*=\s*(no|0)|maximum-scale\s*=\s*1(\.0)?\b/);
+});
+
+test("ticker loops seamlessly and isn't announced twice", async ({ page }) => {
+  await page.goto("/");
+  const track = page.locator(".ticker-track");
+  await expect(track).toHaveAttribute("aria-hidden", "true");
+  const halves = await track.evaluate((el) => [...el.children].map((c) => ({ text: c.textContent, w: Math.round(c.getBoundingClientRect().width) })));
+  expect(halves).toHaveLength(2);
+  expect(halves[0]).toEqual(halves[1]); // identical halves + a -50% loop = no visible jump
+  await expect(page.locator(".ticker .sr-only")).toHaveCount(1);
+  expect(await track.evaluate((el) => el.querySelectorAll("a,button,[tabindex]").length)).toBe(0);
+});
+
+test("pricing shows the ₹599 launch price against the ₹999 regular price", async ({ page }) => {
+  await page.goto("/");
+  const pricing = page.locator("#pricing");
+  await expect(pricing).toContainText("₹599");
+  await expect(pricing.locator("s")).toHaveText("₹999");
+  await expect(pricing).toContainText("Launch offer");
+  await expect(page.locator("#top")).toContainText("₹599");
+});
+
+test("pricing and final CTA show the rendered 3D book images", async ({ page }) => {
+  await page.goto("/");
+  for (const sel of ['#pricing img[src*="book-3d-open"]', 'section[aria-labelledby="final-title"] img[src*="book-3d-closed"]']) {
+    const img = page.locator(sel);
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  }
+});
+
+test("every footer link resolves and policy pages render", async ({ page, request }) => {
+  await page.goto("/");
+  const hrefs = await page.locator("footer a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href")!));
+  expect(hrefs.length).toBeGreaterThanOrEqual(7);
+  for (const href of hrefs) {
+    const res = await request.get(href);
+    expect(res.status(), href).toBe(200);
+  }
+  await page.goto("/refund");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Refund and Cancellation Policy");
+});
+
+test("unknown routes render the 404 page", async ({ page }) => {
+  const res = await page.goto("/this-page-does-not-exist");
+  expect(res?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This page doesn't exist");
 });

@@ -36,19 +36,23 @@ Set `PLAYWRIGHT_BASE_URL` to test a deployed URL instead.
 reference/                     Source PDF (git-ignored, never served)
 docs/CONTENT_AUDIT.md          Product facts checked against the PDF
 docs/PAYMENTS_AND_DELIVERY.md  Checkout status and secure delivery plan
+docs/LAUNCH_CHECKLIST.md       ★ Business, pricing and legal details to confirm before launch
+docs/screenshots/              Desktop / tablet / mobile captures of the current build
+public/images/book/            Renders of the real 3D book (pricing + final CTA)
 public/images/cover.webp       Cover rendered from PDF page 1
 public/images/pages/*.webp     12 preview pages rendered from the PDF
 public/images/figures/*.webp   6 diagrams cropped from the PDF
-src/app/                       layout (metadata, fonts), page, privacy/terms/refund,
+src/app/                       layout (metadata, fonts), page, not-found, and the policy pages
+                               privacy, terms, refund, delivery, disclaimer, copyright, contact;
                                sitemap.ts, robots.ts, icon.svg, OG/Twitter images,
                                api/webhooks/razorpay
-src/data/product.ts            ★ Product facts, pricing, checkout and policy config
+src/data/product.ts            ★ Brand, product facts, pricing (₹599 / ₹999), checkout and support config
 src/data/chapters.ts           10 chapters and 4 stages
 src/data/resources.ts          Prompts, templates, calculators, deliverables
 src/data/content.ts            Section copy, applications, previews
 src/data/faq.ts                FAQ (also emitted as FAQPage JSON-LD)
 src/components/landing/        Page sections
-src/components/ui/             BuyButton, BookMockup, Reveal, Counter, SectionHeader
+src/components/ui/             BuyButton, BookMockup, Reveal, SectionHeader
 src/lib/payments.ts            Webhook signature check + fulfilment stub (server-only)
 src/components/landing/ThreeDEbookShowcase.tsx   Hero 3D book (poster → 3D, auto-open, fallback)
 src/components/threeui/        Vendored ThreeUI BestsellerBooks + BookAssetHost (unmodified, MIT)

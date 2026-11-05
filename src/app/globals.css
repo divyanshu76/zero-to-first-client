@@ -4,14 +4,16 @@
 @theme {
   --color-paper: #faf9f6;
   --color-paper-2: #f1efe9;
-  --color-ink: #171717;
-  --color-ink-2: #65636a;
+  --color-ink: #111113;
+  /* #77747D (brief) is 4.3:1 on ivory, below AA for small text; this is the nearest AA-safe tone (5.2:1). */
+  --color-ink-2: #6b6872;
   --color-violet: #6d28d9;
   --color-violet-deep: #4f46e5;
   --color-violet-accent: #9333ea;
+  --color-violet-press: #5b21b6;
   --color-violet-soft: #ede7fb;
-  --color-line: #e7e3dc;
-  --color-line-strong: #d6d0c5;
+  --color-line: #e8e5ed;
+  --color-line-strong: #d4d0da;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
@@ -20,6 +22,11 @@
   --container-page: 80rem;
 
   --animate-float: float 7s ease-in-out infinite;
+  --animate-ticker: ticker 38s linear infinite;
+  @keyframes ticker {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(-50%, 0, 0); }
+  }
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
@@ -89,8 +96,8 @@
 /* Scroll reveal: content is visible by default; JS opts in to the animation. */
 .js [data-reveal] {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(12px);
+  transition: opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
   transition-delay: var(--reveal-delay, 0ms);
 }
 .js [data-reveal][data-shown="true"] {
@@ -188,4 +195,34 @@
 @keyframes ztfc-book-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }
+}
+
+
+/* ── Interaction system ──────────────────────────────────────
+   Transform/opacity only; one easing; nothing animates without a reason. */
+@utility press {
+  transition: transform 160ms cubic-bezier(0.2, 0.7, 0.2, 1), background-color 200ms, box-shadow 200ms, border-color 200ms, color 200ms;
+  &:active:not(:disabled) { transform: scale(0.975); }
+}
+@utility lift {
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 260ms, border-color 260ms;
+  @media (hover: hover) {
+    &:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -28px rgb(17 17 19 / 0.35); }
+  }
+}
+/* Underline that draws in from the left on hover/focus. */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 260ms cubic-bezier(0.2, 0.7, 0.2, 1), color 200ms;
+  &:hover, &:focus-visible { background-size: 100% 1px; }
+}
+
+/* Ticker: two identical tracks and a -50% loop = seamless. Pauses on hover; still under reduced motion. */
+.ticker-track { animation: var(--animate-ticker); will-change: transform; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; transform: none; }
 }
