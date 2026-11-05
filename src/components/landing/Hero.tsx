@@ -1,6 +1,6 @@
 import { ArrowDown, Languages } from "lucide-react";
 import { stats } from "@/data/product";
-import { BookMockup } from "@/components/ui/BookMockup";
+import { ThreeDEbookShowcase } from "./ThreeDEbookShowcase";
 import { BuyButton } from "@/components/ui/BuyButton";
 import { Counter } from "@/components/ui/Counter";
 
@@ -8,7 +8,7 @@ export function Hero() {
   return (
     <section id="top" aria-labelledby="hero-title" className="relative overflow-hidden">
       <div aria-hidden className="paper-grain absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
-      <div className="container-page relative grid items-center gap-10 pt-10 pb-20 sm:pt-16 lg:grid-cols-[1.08fr_0.92fr] lg:gap-10 lg:pt-20 lg:pb-28">
+      <div className="container-page relative grid items-center gap-10 pt-10 pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:gap-8 lg:pt-20 lg:pb-28">
         <div>
           <p className="eyebrow">The 2026 AI-Powered Business Starter Kit</p>
           <h1 id="hero-title" className="mt-5 text-[2.9rem] leading-[0.98] font-extrabold text-ink sm:text-[4rem] lg:text-[4.6rem] xl:text-[5.1rem]">
@@ -51,15 +51,8 @@ export function Hero() {
           </dl>
         </div>
 
-        <div className="relative order-first mx-auto w-full max-w-[13.5rem] sm:max-w-[22rem] lg:order-none lg:max-w-[27rem]">
-          <div aria-hidden className="absolute -inset-x-10 top-[8%] bottom-[2%] -z-0 rounded-[2.5rem] bg-paper-2" />
-          <div aria-hidden className="absolute top-[14%] -left-6 hidden h-[72%] w-px bg-line-strong sm:block" />
-          <div className="relative px-4 pt-4 pb-8 sm:px-8 sm:pt-6 sm:pb-10">
-            <BookMockup preload sizes="(min-width: 1024px) 400px, (min-width: 640px) 360px, 80vw" />
-          </div>
-          <p className="relative mt-2 hidden text-center sm:block text-[0.78rem] text-ink-2">
-            2026 Edition · Edition 1.0 · 142 pages
-          </p>
+        <div className="relative w-full">
+          <ThreeDEbookShowcase />
         </div>
       </div>
     </section>

@@ -1,0 +1,122 @@
+.css-stage{perspective:2500px}
+.book-card{appearance:none;border:0;padding:0;background:none;position:relative;display:block;width:100%;height:100%;overflow:visible;transform-style:preserve-3d;font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Baskerville,Georgia,serif;--ease:cubic-bezier(.2,.78,.2,1);cursor:grab}
+.book-card:hover{background:none;border:0}
+.book{position:relative;display:block;width:100%;height:100%;transform-style:preserve-3d}
+.book-back,.page-block,.page-fan,.front-cover,.book-shadow{position:absolute;inset:0;border-radius:3px 7px 7px 3px}
+.book-shadow{inset:5% -4% -2% 4%;background:#18120a;filter:blur(22px);opacity:.5;transform:translate3d(18px,28px,-65px)}
+.book-back{background:var(--cover-color);border:2px solid #786245;transform:translateZ(calc(var(--book-depth) * -.5));box-shadow:0 18px 30px #18120a55}
+.book-spine{position:absolute;top:0;left:0;width:var(--book-depth);height:100%;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-size:calc(var(--book-unit) * 3.5);letter-spacing:.08em;color:#ead9b3;border:2px solid #9c8155;background:linear-gradient(90deg,#0004,transparent 25%,#fff2 65%,#0005),var(--cover-color);transform-origin:left center;transform:translateZ(calc(var(--book-depth) * .5)) rotateY(90deg)}
+.page-block{inset:1.8% 2% 1.8% 3.8%;transform-style:preserve-3d;transform:translateZ(calc(var(--book-depth) * .4));background:linear-gradient(90deg,#b7a482,#f4e9cd 9%,#eaddbe);border:1px solid #bcaa88;border-radius:1px}
+.paper-edge{position:absolute;display:block;background:repeating-linear-gradient(90deg,#c1ad87 0 1px,#eee2c4 1px 3px);width:calc(var(--book-depth) * .8);height:100%;transform-origin:left center}
+.paper-fore{left:100%;top:0;transform:rotateY(90deg)}
+.paper-top,.paper-bottom{left:0;width:100%;height:calc(var(--book-depth) * .8);background:repeating-linear-gradient(0deg,#baa780 0 1px,#efe1c1 1px 3px);transform-origin:center top;transform:rotateX(-90deg)}
+.paper-top{top:0}.paper-bottom{top:100%}
+.title-page{position:absolute;inset:12% 12% 10%;display:flex;align-items:center;justify-content:center;border:1px solid #b8a581;color:#57442c;font-size:calc(var(--book-unit) * 8);font-style:italic;background:linear-gradient(90deg,#00000006,transparent)}
+.title-page::after{content:'FIELD MANUAL';position:absolute;bottom:12%;font-size:calc(var(--book-unit) * 2);letter-spacing:.16em}
+.page-fan{inset:2% 2.2% 2% 3.9%;pointer-events:none;transform-style:preserve-3d}
+.page-fan i{position:absolute;inset:0;display:block;border:1px solid #c4b18e;background:linear-gradient(90deg,#cdbb98,#f4e9d0 12%,#eee0c1);transform-origin:left center;transform:translateZ(calc(var(--book-depth) * .42));border-radius:1px}
+.front-cover{transform-style:preserve-3d;transform:translateZ(calc(var(--book-depth) * .5));transform-origin:left center}
+.cover-face,.cover-lining{position:absolute;inset:0;border-radius:inherit;backface-visibility:hidden}
+.cover-face{overflow:hidden;background:var(--cover-color) var(--cover) center/cover;border:1px solid #eedec233;box-shadow:inset -12px 0 18px #0002,inset 4px 0 9px #fff2;transform:translateZ(1px)}
+.cover-lining{background:repeating-linear-gradient(45deg,#c4ad83 0 1px,#dfcda6 1px 5px);border:calc(var(--book-unit) * 2) solid var(--cover-color);transform:rotateY(180deg) translateZ(1px)}
+.cover-face::after{content:'';position:absolute;inset:0;border:3px solid #ffffff0a;border-radius:inherit;pointer-events:none;z-index:4}
+.cover-motion{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 420ms ease;pointer-events:none}
+.cover-motion[data-ready=true]{opacity:1}
+    .cover-copy {
+      position: absolute;
+      z-index: 2;
+      inset: 5.8% 7.5% 5.5%;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      align-content: start;
+      color: var(--cover-ink);
+      text-align: center;
+      text-shadow: 0 1px 0 rgba(241, 226, 196, .24);
+    }
+
+    .cover-kicker {
+      font-size: calc(var(--book-unit) * 2.6);
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .cover-title {
+      margin-top: 2.2%;
+      font-size: calc(var(--book-unit) * 15.5);
+      font-weight: 600;
+      letter-spacing: -.055em;
+      line-height: .9;
+    }
+
+    .cover-subtitle {
+      margin-top: 3%;
+      font-size: calc(var(--book-unit) * 3.65);
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: .035em;
+    }
+
+    .cover-footer {
+      align-self: end;
+      padding-top: 3%;
+      border-top: 1px solid currentColor;
+      font-size: calc(var(--book-unit) * 2.2);
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .book-card[data-book="codex"] .cover-copy {
+      --cover-ink: #31291e;
+    }
+
+    .book-card[data-book="claude"] .cover-copy {
+      --cover-ink: #4b281a;
+    }
+
+    .book-card[data-book="cursor"] .cover-copy {
+      --cover-ink: #293024;
+    }
+
+
+
+[data-interacted=true] :is(.front-cover,.page-fan i){transition:transform 1200ms var(--ease)}
+[data-open=true] .front-cover{transform:translateZ(calc(var(--book-depth) * .5)) rotateY(-62deg)}
+[data-open=true] .page-fan i:nth-child(1){transform:translateZ(calc(var(--book-depth) * .42)) rotateY(-5deg)}
+[data-open=true] .page-fan i:nth-child(2){transform:translateZ(calc(var(--book-depth) * .44)) rotateY(-12deg)}
+[data-open=true] .page-fan i:nth-child(3){transform:translateZ(calc(var(--book-depth) * .46)) rotateY(-20deg)}
+[data-open=true] .page-fan i:nth-child(4){transform:translateZ(calc(var(--book-depth) * .48)) rotateY(-30deg)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}.cover-motion{display:none}}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   ZERO TO FIRST CLIENT edition — added for DEADCODE LABS.
+   Original book.css above is unchanged (sha256 7a9884fc4df59e083ea09b4d01800307446de2cf889c21774354f52ea2f86613,
+   ThreeUI Community, MIT — see ../THREEUI-NOTICE.md). These rules only re-skin the
+   existing construction: geometry, transforms and the 1200 ms hinge easing are untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+.book-card[data-book="ztfc"]{font-family:Manrope,Inter,"Segoe UI",system-ui,-apple-system,sans-serif}
+[data-book="ztfc"] .book-shadow{background:#2a1d52;opacity:.34;filter:blur(26px)}
+[data-book="ztfc"] .book-back{background:#f1efe9;border:1px solid #ddd7cc;box-shadow:0 22px 40px rgb(42 29 82 / .22)}
+[data-book="ztfc"] .book-spine{color:#171717;border:1px solid #e2ddd3;font-weight:800;letter-spacing:.22em;text-transform:uppercase;font-size:calc(var(--book-unit) * 2.6);
+  background:linear-gradient(#6d28d9 0 0) center 7%/100% 2.2% no-repeat,linear-gradient(#6d28d9 0 0) center 93%/100% 2.2% no-repeat,linear-gradient(90deg,#0002,transparent 25%,#fff9 62%,#0002),#faf9f6}
+[data-book="ztfc"] .page-block{background:linear-gradient(90deg,#d8d3c9,#fcfbf8 9%,#f5f3ee);border-color:#ddd7cc}
+[data-book="ztfc"] .paper-edge{background:repeating-linear-gradient(90deg,#d9d4ca 0 1px,#f8f6f1 1px 3px)}
+[data-book="ztfc"] :is(.paper-top,.paper-bottom){background:repeating-linear-gradient(0deg,#d9d4ca 0 1px,#f8f6f1 1px 3px)}
+[data-book="ztfc"] .title-page{color:transparent;border:0;background:#faf9f6}
+[data-book="ztfc"] .title-page::after{content:none}
+[data-book="ztfc"] .page-fan i{border-color:#e2ddd3;background:linear-gradient(90deg,#dcd6cb,#fdfcf9 10%,#f8f6f1)}
+[data-book="ztfc"] .page-fan i.ztfc-page{background-color:#fff;background-size:auto,cover;background-position:0 0,center top;background-repeat:no-repeat}
+[data-book="ztfc"] .page-fan i.ztfc-page-02{background-image:linear-gradient(90deg,rgb(0 0 0 / .13),transparent 7%),url('./ztfc/page-02.webp')}
+[data-book="ztfc"] .page-fan i.ztfc-page-03{background-image:linear-gradient(90deg,rgb(0 0 0 / .13),transparent 7%),url('./ztfc/page-03.webp')}
+[data-book="ztfc"] .page-fan i.ztfc-page-04{background-image:linear-gradient(90deg,rgb(0 0 0 / .13),transparent 7%),url('./ztfc/page-04.webp')}
+[data-book="ztfc"] .cover-face{background-position:center;border:1px solid #e7e3dc;box-shadow:inset -12px 0 18px #0001,inset 5px 0 8px #0002}
+[data-book="ztfc"] .cover-lining{background:#f4f2ec;border-color:#faf9f6}
+/* Staged opening: the cover swings first, then the first pages fan out one after another. */
+[data-interacted=true] [data-book="ztfc"] .page-fan i{transition:transform 1400ms var(--ease)}
+[data-interacted=true][data-open=true] [data-book="ztfc"] .page-fan i:nth-child(4){transition-delay:220ms}
+[data-interacted=true][data-open=true] [data-book="ztfc"] .page-fan i:nth-child(3){transition-delay:520ms}
+[data-interacted=true][data-open=true] [data-book="ztfc"] .page-fan i:nth-child(2){transition-delay:820ms}
+[data-interacted=true][data-open=true] [data-book="ztfc"] .page-fan i:nth-child(1){transition-delay:1050ms}
+[data-interacted=true][data-open=false] [data-book="ztfc"] .front-cover{transition-delay:260ms}

@@ -56,3 +56,6 @@ reference/
 .claude/
 .vscode/
 .idea/
+
+# Local browser-test output
+.playwright-mcp/

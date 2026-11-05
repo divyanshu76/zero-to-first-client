@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zero to First Client · Animated Book</title><link rel="stylesheet" href="../runtime/style.css"><link rel="stylesheet" href="./book.css"></head><body><main id="asset" aria-label="Zero to First Client · Animated Book"></main><script type="module">
+import {mountBestsellers as mount} from './viewer.js';const p=new URLSearchParams(location.search);
+try{const view=await mount(document.querySelector('#asset'),{edition:p.get('edition')||undefined,controls:p.get('controls')!=='false',background:p.get('background')||'dark',open:p.get('open')==='true'});document.body.dataset.state='ready';parent.postMessage({type:'book-asset',kind:'bestsellers',state:'ready'},'*');addEventListener('pagehide',view.dispose,{once:true});}catch(error){document.body.dataset.state='error';parent.postMessage({type:'book-asset',kind:'bestsellers',state:'error'},'*');console.error(error);}
+</script><script type="module">
+// ZERO TO FIRST CLIENT addition (not in the original ThreeUI preview.html,
+// sha256 7c861c923f25ef49f0075fa819763eeb393bfaeb77f2a745bf8c4179c3907bb1). The sandboxed
+// iframe can't be scripted by the host page, so this bridge lets the host request
+// open/close/rest (rest = the viewer's own Home-key reset, sent when the pointer leaves). It reuses the viewer's own keyboard toggle, so the original transition runs,
+// and it reports open-state changes back to the host page.
+const host=document.querySelector('#asset');
+addEventListener('message',e=>{if(e.source!==parent||e.data?.type!=='book-asset-command')return;const stage=host.querySelector('.css-stage');if(!stage)return;if(e.data.command==='rest'){stage.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));return;}const isOpen=host.dataset.open==='true';const want=e.data.command==='toggle'?!isOpen:e.data.command==='open';if(want!==isOpen)stage.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));});
+new MutationObserver(()=>parent.postMessage({type:'book-asset-open',kind:'bestsellers',open:host.dataset.open==='true'},'*')).observe(host,{attributes:true,attributeFilter:['data-open']});
+</script></body></html>

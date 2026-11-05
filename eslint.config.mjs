@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party source (ThreeUI Community, MIT), kept byte-identical to
+    // the registered bundle so it can be re-verified by hash. TypeScript still checks it.
+    "src/components/threeui/**",
+    "public/3d-assets/**",
   ]),
 ]);
 

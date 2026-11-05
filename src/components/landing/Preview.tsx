@@ -56,7 +56,7 @@ export function Preview() {
 
       <div className="mt-14">
         <ul
-          className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [scrollbar-width:thin] sm:gap-6"
+          className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [contain:paint] [scrollbar-width:thin] sm:gap-6"
           aria-label="Ebook page previews"
         >
           {previews.map((p, i) => (

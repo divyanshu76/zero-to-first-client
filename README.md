@@ -34,7 +34,15 @@ src/data/faq.ts                FAQ (also emitted as FAQPage JSON-LD)
 src/components/landing/        Page sections
 src/components/ui/             BuyButton, BookMockup, Reveal, Counter, SectionHeader
 src/lib/payments.ts            Webhook signature check + fulfilment stub (server-only)
+src/components/landing/ThreeDEbookShowcase.tsx   Hero 3D book (poster → 3D, auto-open, fallback)
+src/components/threeui/        Vendored ThreeUI BestsellerBooks + BookAssetHost (unmodified, MIT)
+public/3d-assets/books/        ThreeUI book runtime + the ZTFC edition (cover and PDF pages 2–4)
+                               Changes are listed in public/3d-assets/books/THREEUI-NOTICE.md
 ```
+
+The hero book runs inside an iframe sandboxed with `allow-scripts` only. `next.config.ts` sends
+`Access-Control-Allow-Origin: *` for `/3d-assets/*`, because without it the browser blocks the
+book's module scripts.
 
 ## Configuration
 Everything you need to decide lives in `.env.example`:
