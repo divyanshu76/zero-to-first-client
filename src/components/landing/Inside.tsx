@@ -60,8 +60,8 @@ export function Inside() {
           <Card letter="B" kicker={`${totalPrompts} practical prompts`} title="Prompts with a verify step" body="Fill in the [brackets] and paste. Every prompt states its purpose, the output to expect and what to check before you trust it — so you work with AI systematically, not randomly." className="lg:col-span-3" delay={80}>
             <div className="space-y-2.5">
               {promptBreakdown.map((p) => (
-                <div key={p.label} className="flex items-center gap-4">
-                  <div className="h-9 shrink-0 rounded-lg bg-violet/90" style={{ width: `${Math.max(12, (p.count / totalPrompts) * 100)}%` }} aria-hidden />
+                <div key={p.label} className="flex flex-col-reverse gap-1.5 sm:flex-row sm:items-center sm:gap-4">
+                  <div className="h-2.5 shrink-0 rounded-full bg-violet/90 sm:h-9 sm:rounded-lg" style={{ width: `${Math.max(12, (p.count / totalPrompts) * 100)}%` }} aria-hidden />
                   <p className="min-w-0 text-[0.85rem] leading-tight text-ink">
                     <span className="font-display font-bold">{p.count}</span> {p.label}
                     <span className="block text-ink-2">{p.detail}</span>
@@ -87,7 +87,7 @@ export function Inside() {
                   ) : (
                     <FileText aria-hidden className="size-4 shrink-0 text-violet-deep" />
                   )}
-                  <span className="min-w-0 flex-1 truncate text-ink">{t.name}</span>
+                  <span className="min-w-0 flex-1 leading-snug text-ink">{t.name}</span>
                   <span className="text-[0.68rem] font-semibold tracking-wide text-ink-2">{t.format}</span>
                 </li>
               ))}

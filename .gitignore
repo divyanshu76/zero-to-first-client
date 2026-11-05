@@ -59,3 +59,8 @@ reference/
 
 # Local browser-test output
 .playwright-mcp/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/

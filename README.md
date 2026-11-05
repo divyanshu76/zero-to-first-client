@@ -11,8 +11,24 @@ cp .env.example .env.local   # optional — the site works without it
 npm run dev                  # http://localhost:3000
 npm run build && npm start   # production
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 ```
+
+### Responsive tests
+
+```bash
+npx playwright install chromium webkit   # once
+npm run build && npm run test:responsive
+```
+
+The suite in `tests/responsive.spec.ts` covers 19 device widths (320–2560 px) and 22 browser-zoom
+levels (50–200% at 1366 and 1920). It runs in Chromium and WebKit, and fails if:
+- any element makes the page wider than the viewport, checked with the `body` safety net off
+- the visual viewport scale drops below 1 on mobile
+- the hero CTAs overlap or misalign
+- the 3D book leaves the viewport, or a section is missing
+
+Set `PLAYWRIGHT_BASE_URL` to test a deployed URL instead.
 
 ## Structure
 

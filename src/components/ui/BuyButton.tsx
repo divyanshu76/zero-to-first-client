@@ -61,8 +61,9 @@ export function BuyButton({ label, currency = "INR", variant = "primary", size =
         id={noticeId}
         role="status"
         aria-live="polite"
-        className={`mt-3 flex max-w-xs items-start gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-left text-[0.8rem] leading-snug text-ink-2 shadow-sm transition-all ${
-          open ? "opacity-100" : "pointer-events-none h-0 overflow-hidden border-0 p-0 opacity-0"
+        // Collapsed: no padding, border or margin, so the empty live region takes no space and the CTA rows line up.
+        className={`flex max-w-xs items-start gap-2 rounded-xl bg-white text-left text-[0.8rem] leading-snug text-ink-2 transition-opacity ${
+          open ? "mt-3 border border-line px-3.5 py-2.5 opacity-100 shadow-sm" : "pointer-events-none h-0 overflow-hidden opacity-0"
         }`}
       >
         {open ? (

@@ -45,6 +45,14 @@
     text-wrap: balance;
   }
   p { text-wrap: pretty; }
+  /* Safety net only. Root causes of horizontal overflow are fixed at the source.
+     If a future element escapes its clipping box, this stops the page from widening;
+     a wider page makes iOS Safari zoom out and squeeze the layout into a narrow column.
+     `clip` (unlike `hidden`) creates no scroll container, so position: sticky keeps
+     working. It never affects pinch-zoom or browser zoom. */
+  @supports (overflow-x: clip) {
+    body { overflow-x: clip; }
+  }
   ::selection { background: #ddd0fa; color: var(--color-ink); }
   :focus-visible {
     outline: 2px solid var(--color-violet);

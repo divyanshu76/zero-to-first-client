@@ -56,7 +56,7 @@ export function Preview() {
 
       <div className="mt-14">
         <ul
-          className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [contain:paint] [scrollbar-width:thin] sm:gap-6"
+          className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [scrollbar-width:thin] sm:gap-6"
           aria-label="Ebook page previews"
         >
           {previews.map((p, i) => (
@@ -67,7 +67,7 @@ export function Preview() {
                   lastTrigger.current = e.currentTarget;
                   show(i);
                 }}
-                className="group block w-full text-left"
+                className="group relative block w-full text-left"
               >
                 <span className="relative block aspect-[595/842] overflow-hidden rounded-lg border border-line bg-white shadow-[0_18px_40px_-24px_rgb(23_23_23/0.45)] transition-transform duration-300 group-hover:-translate-y-1">
                   <Image src={p.src} alt="" fill sizes="(min-width: 1024px) 280px, (min-width: 640px) 40vw, 68vw" className="object-cover" />
