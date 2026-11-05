@@ -129,7 +129,7 @@ for (const c of [...devicesMatrix, ...zoomMatrix]) {
       }
 
       // 3D book stage stays inside the viewport.
-      const stage = await page.locator(".ztfc-book-stage").boundingBox();
+      const stage = await page.locator("#top .ztfc-book-stage").boundingBox();
       expect(stage).not.toBeNull();
       expect(stage!.x).toBeGreaterThanOrEqual(-1);
       expect(stage!.x + stage!.width).toBeLessThanOrEqual(report.width + 1);
@@ -178,15 +178,6 @@ test("pricing shows the ₹599 launch price against the ₹999 regular price", a
   await expect(pricing.locator("s")).toHaveText("₹999");
   await expect(pricing).toContainText("Launch offer");
   await expect(page.locator("#top")).toContainText("₹599");
-});
-
-test("pricing and final CTA show the rendered 3D book images", async ({ page }) => {
-  await page.goto("/");
-  for (const sel of ['#pricing img[src*="book-3d-open"]', 'section[aria-labelledby="final-title"] img[src*="book-3d-closed"]']) {
-    const img = page.locator(sel);
-    await img.scrollIntoViewIfNeeded();
-    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
-  }
 });
 
 test("every footer link resolves and policy pages render", async ({ page, request }) => {

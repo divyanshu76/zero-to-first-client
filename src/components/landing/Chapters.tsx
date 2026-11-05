@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { Plus, Target, Wrench, Flag } from "lucide-react";
-import { chapters, stages } from "@/data/chapters";
+import { chapterFacts, stages } from "@/data/chapters";
+import type { Dictionary } from "@/i18n/dictionaries/en";
+import { fmt } from "@/i18n/config";
 
-export function ChapterList() {
+export function ChapterList({ t }: { t: Dictionary["chapters"] }) {
+  const chapters = chapterFacts.map((f) => ({ ...f, ...t.items[f.number - 1] }));
   const [open, setOpen] = useState<number[]>([]);
   const allOpen = open.length === chapters.length;
   const toggle = (n: number) => setOpen((o) => (o.includes(n) ? o.filter((x) => x !== n) : [...o, n]));
@@ -12,26 +15,29 @@ export function ChapterList() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h3 className="text-xl font-bold text-ink sm:text-2xl">All ten chapters</h3>
+        <div>
+          <h3 className="text-xl font-bold text-ink sm:text-2xl">{t.heading}</h3>
+          <p className="mt-1 text-[0.9rem] text-ink-2">{t.intro}</p>
+        </div>
         <button
           type="button"
           onClick={() => setOpen(allOpen ? [] : chapters.map((c) => c.number))}
           className="press shrink-0 rounded-full border border-line-strong px-4 py-2 text-sm font-semibold text-ink hover:border-ink hover:bg-white"
         >
-          {allOpen ? "Collapse all" : "Expand all"}
+          {allOpen ? t.collapse : t.expand}
         </button>
       </div>
 
       <div className="space-y-8">
-        {stages.map((stage) => (
+        {stages.map((stage, si) => (
           <div key={stage.id}>
             <div className="mb-1 flex items-baseline gap-3 border-b border-ink pb-2.5">
-              <span className="font-display text-[0.8rem] font-bold text-violet">{stage.label}</span>
-              <h4 className="font-display text-base font-bold text-ink">{stage.title}</h4>
+              <span className="font-display text-[0.8rem] font-bold text-violet">{t.stages[si].label}</span>
+              <h4 className="font-display text-base font-bold text-ink">{t.stages[si].title}</h4>
             </div>
             <ul className="divide-y divide-line">
               {chapters
-                .filter((c) => c.stage === stage.id)
+                .filter((c) => stage.chapters.includes(c.number))
                 .map((c) => {
                   const isOpen = open.includes(c.number);
                   const panelId = `chapter-panel-${c.number}`;
@@ -51,7 +57,7 @@ export function ChapterList() {
                             {String(c.number).padStart(2, "0")}
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-display text-lg font-bold text-ink sm:text-xl">{c.title}</span>
+                            <span lang="en" className="block font-display text-lg font-bold text-ink sm:text-xl">{c.title}</span>
                             <span className="mt-1.5 block text-[0.95rem] leading-snug text-ink-2">{c.hook}</span>
                           </span>
                           <span
@@ -74,7 +80,7 @@ export function ChapterList() {
                           <div className="grid gap-8 pb-7 sm:pl-[6rem] lg:grid-cols-[1.25fr_1fr] lg:gap-12">
                             <div>
                               <p className="text-[1.02rem] leading-relaxed text-ink">{c.summary}</p>
-                              <p className="mt-6 font-display text-sm font-bold text-ink">What you&apos;ll learn</p>
+                              <p className="mt-6 font-display text-sm font-bold text-ink">{t.learn}</p>
                               <ul className="mt-3 space-y-2.5">
                                 {c.learn.map((l) => (
                                   <li key={l} className="flex gap-3 text-[0.95rem] leading-snug text-ink-2">
@@ -87,28 +93,28 @@ export function ChapterList() {
                             <div className="space-y-4">
                               <div className="rounded-2xl bg-paper-2 p-5">
                                 <p className="flex items-center gap-2 font-display text-sm font-bold text-ink">
-                                  <Wrench aria-hidden className="size-4 text-violet" /> In practice <span className="font-normal text-ink-2">(hypothetical)</span>
+                                  <Wrench aria-hidden className="size-4 text-violet" /> {t.practice} <span className="font-normal text-ink-2">{t.hypothetical}</span>
                                 </p>
                                 <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-2">{c.application}</p>
                               </div>
                               <div className="rounded-2xl border border-violet/25 bg-violet-soft/60 p-5">
                                 <p className="flex items-center gap-2 font-display text-sm font-bold text-ink">
-                                  <Target aria-hidden className="size-4 text-violet" /> What you work towards
+                                  <Target aria-hidden className="size-4 text-violet" /> {t.outcome}
                                 </p>
                                 <p className="mt-2 text-[0.92rem] leading-relaxed text-ink">{c.outcome}</p>
                               </div>
                               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8rem] text-ink-2">
                                 <Flag aria-hidden className="size-3.5 text-violet" />
-                                <span>Starts p. {c.page}</span>
+                                <span>{fmt(t.starts, { n: c.page })}</span>
                                 <span aria-hidden>·</span>
                                 <span>{c.prompts}</span>
                                 <span aria-hidden>·</span>
-                                <span>{c.figures.length === 1 ? `Figure ${c.figures[0]}` : `Figures ${c.figures[0]}–${c.figures[c.figures.length - 1]}`}</span>
+                                <span>{c.figures.length === 1 ? fmt(t.figure, { n: c.figures[0] }) : fmt(t.figures, { a: c.figures[0], b: c.figures[c.figures.length - 1] })}</span>
                               </p>
                               <details className="group/d text-[0.85rem]">
                                 <summary className="cursor-pointer list-none font-semibold text-violet [&::-webkit-details-marker]:hidden">
-                                  <span className="group-open/d:hidden">Show all {c.sections.length} sections</span>
-                                  <span className="hidden group-open/d:inline">Hide sections</span>
+                                  <span className="group-open/d:hidden">{fmt(t.showSections, { n: c.sections.length })}</span>
+                                  <span className="hidden group-open/d:inline">{t.hideSections}</span>
                                 </summary>
                                 <ol className="mt-3 list-decimal space-y-1 pl-5 text-ink-2">
                                   {c.sections.map((s) => (

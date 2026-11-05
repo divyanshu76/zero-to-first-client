@@ -6,6 +6,10 @@ import { isPurchasable, pricing, type CurrencyCode } from "@/data/product";
 
 type Props = {
   label: string;
+  /** Pre-launch explanation shown when no checkout is configured. */
+  notice: string;
+  /** Button text while navigating to checkout. */
+  redirecting: string;
   currency?: CurrencyCode;
   variant?: "primary" | "dark" | "light";
   size?: "md" | "lg";
@@ -27,7 +31,7 @@ const sizes = { md: "h-12 px-6 text-[0.95rem]", lg: "h-14 px-8 text-base" };
  * submission) and shows a loading state. Without one it explains that checkout isn't
  * open. It never simulates a purchase; payment is confirmed server-side by the provider.
  */
-export function BuyButton({ label, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left" }: Props) {
+export function BuyButton({ label, notice, redirecting: redirectingLabel, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left" }: Props) {
   const preferred = pricing[currency];
   const target = isPurchasable(preferred) ? preferred : isPurchasable(pricing.INR) ? pricing.INR : isPurchasable(pricing.USD) ? pricing.USD : null;
   const [open, setOpen] = useState(false);
@@ -64,7 +68,7 @@ export function BuyButton({ label, currency = "INR", variant = "primary", size =
         }}
       >
         {redirecting ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-        {redirecting ? "Opening secure checkout…" : label}
+        {redirecting ? redirectingLabel : label}
       </button>
     );
   }
@@ -86,7 +90,7 @@ export function BuyButton({ label, currency = "INR", variant = "primary", size =
         {open ? (
           <>
             <Clock aria-hidden className="mt-0.5 size-3.5 shrink-0 text-violet" />
-            Checkout isn&apos;t open yet. Secure payment will be available here at launch.
+            {notice}
           </>
         ) : null}
       </span>

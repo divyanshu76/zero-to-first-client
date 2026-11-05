@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // Two root layouts (English at /, Hindi at /hi) need a routing-level 404.
+  experimental: { globalNotFound: true },
   // The ThreeUI book runs in an iframe sandboxed with only `allow-scripts` (no
   // allow-same-origin), so its documents have an opaque "null" origin. ES module
   // scripts are fetched in CORS mode, so these public, static, non-credentialed

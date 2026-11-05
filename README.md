@@ -54,15 +54,31 @@ src/data/faq.ts                FAQ (also emitted as FAQPage JSON-LD)
 src/components/landing/        Page sections
 src/components/ui/             BuyButton, BookMockup, Reveal, SectionHeader
 src/lib/payments.ts            Webhook signature check + fulfilment stub (server-only)
-src/components/landing/ThreeDEbookShowcase.tsx   Hero 3D book (poster → 3D, auto-open, fallback)
+src/components/landing/BookShowcase.tsx   The 3D book in all three places: hero, pricing, final CTA
+src/i18n/                      Languages: config, en/hi dictionaries, faq helper, policies/<slug>.tsx
+src/app/(en)/ · src/app/(hi)/hi/  English at /, Hindi at /hi (one root layout per language)
 src/components/threeui/        Vendored ThreeUI BestsellerBooks + BookAssetHost (unmodified, MIT)
 public/3d-assets/books/        ThreeUI book runtime + the ZTFC edition (cover and PDF pages 2–4)
                                Changes are listed in public/3d-assets/books/THREEUI-NOTICE.md
 ```
 
-The hero book runs inside an iframe sandboxed with `allow-scripts` only. `next.config.ts` sends
+The book runs inside an iframe sandboxed with `allow-scripts` only. `next.config.ts` sends
 `Access-Control-Allow-Origin: *` for `/3d-assets/*`, because without it the browser blocks the
 book's module scripts.
+
+## Languages (English and Hindi)
+
+- English is served at `/` and Hindi at `/hi`, for the home page and all 7 policy pages. Each language has its own root layout, so `<html lang>`, canonical and hreflang tags are correct in the static HTML.
+- All copy lives in `src/i18n/dictionaries/en.ts`. `hi.ts` is typed as the same `Dictionary`, so a missing key fails the build, and `tests/i18n.spec.ts` checks that array lengths match.
+- Product facts, prices and page references are in `src/data` and shared between languages, so a translation can't change them.
+- Policy text is in `src/i18n/policies/<slug>.tsx`, with one `en` and one `hi` entry per policy.
+- The EN | हिन्दी switcher links to the same page in the other language and keeps the current `#section`. The choice is remembered in the visitor's browser:
+  - a visitor who picked Hindi goes back to Hindi when they open an English URL
+  - picking English explicitly always wins
+- To add a language:
+  - add it to `locales` in `src/i18n/config.ts`
+  - add a dictionary and policy entries
+  - add an `app/(xx)/xx/` route group
 
 ## Configuration
 Everything you need to decide lives in `.env.example`:

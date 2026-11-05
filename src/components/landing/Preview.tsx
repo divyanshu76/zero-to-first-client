@@ -3,10 +3,13 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
-import { previews } from "@/data/content";
+import { previewPages } from "@/data/content";
+import type { Dictionary } from "@/i18n/dictionaries/en";
+import { fmt } from "@/i18n/config";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
-export function Preview() {
+export function Preview({ t }: { t: Dictionary["preview"] }) {
+  const previews = previewPages.map((p, i) => ({ ...p, ...t.items[i] }));
   const [index, setIndex] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -16,7 +19,7 @@ export function Preview() {
   const show = useCallback((i: number) => {
     setLoaded(false);
     setFailed(false);
-    setIndex((i + previews.length) % previews.length);
+    setIndex((i + previewPages.length) % previewPages.length);
   }, []);
 
   useEffect(() => {
@@ -48,15 +51,15 @@ export function Preview() {
       <div className="container-page">
         <SectionHeader
           id="preview-title"
-          title="Look inside before you buy"
-          intro={`${previews.length} real pages from the 142-page PDF — enough to judge the format and depth without giving the whole book away. Tap any page to enlarge it.`}
+          title={t.title}
+          intro={fmt(t.intro, { n: previews.length })}
         />
       </div>
 
       <div className="mt-8">
         <ul
           className="container-page flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [scrollbar-width:thin] sm:gap-6"
-          aria-label="Ebook page previews"
+          aria-label={t.listLabel}
         >
           {previews.map((p, i) => (
             <li key={p.src} className="w-[68%] shrink-0 snap-start sm:w-[42%] md:w-[30%] lg:w-[22%]">
@@ -74,7 +77,7 @@ export function Preview() {
                     <Expand aria-hidden className="size-3.5" />
                   </span>
                 </span>
-                <span className="sr-only">Enlarge preview: </span>
+                <span className="sr-only">{t.enlarge}</span>
                 <span className="mt-3 flex items-baseline justify-between gap-2">
                   <span className="font-display text-[0.95rem] font-semibold text-ink">{p.title}</span>
                   <span className="text-xs text-ink-2">{p.page}</span>
@@ -92,7 +95,7 @@ export function Preview() {
         onClick={(e) => {
           if (e.target === dialogRef.current) close();
         }}
-        aria-label={current ? `${current.title} preview` : "Preview"}
+        aria-label={current ? fmt(t.dialog, { title: current.title }) : t.title}
         className="m-auto h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-ink/85 backdrop:backdrop-blur-sm"
       >
         {current ? (
@@ -101,7 +104,7 @@ export function Preview() {
               <p className="font-display text-sm font-semibold">
                 {current.title} <span className="font-normal text-white/60">· {current.page} · {index! + 1}/{previews.length}</span>
               </p>
-              <button type="button" onClick={close} className="inline-flex size-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20" aria-label="Close preview">
+              <button type="button" onClick={close} className="inline-flex size-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20" aria-label={t.close}>
                 <X aria-hidden className="size-5" />
               </button>
             </div>
@@ -109,18 +112,18 @@ export function Preview() {
               {!loaded && !failed ? (
                 <div className="absolute inset-0 flex items-center justify-center" role="status">
                   <span className="size-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  <span className="sr-only">Loading page</span>
+                  <span className="sr-only">{t.loading}</span>
                 </div>
               ) : null}
               {failed ? (
                 <div className="absolute inset-0 flex items-center justify-center text-center text-sm text-white/80" role="alert">
-                  This preview couldn&apos;t load. Check your connection and try again.
+                  {t.error}
                 </div>
               ) : null}
               <Image
                 key={current.src}
                 src={current.src}
-                alt={`Page from ZERO TO FIRST CLIENT: ${current.title}. ${current.caption}`}
+                alt={fmt(t.alt, { title: current.title, caption: current.caption })}
                 fill
                 sizes="(min-width: 768px) 768px, 100vw"
                 className={`object-contain transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
@@ -129,11 +132,11 @@ export function Preview() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => show(index! - 1)} className="inline-flex size-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Previous page">
+              <button type="button" onClick={() => show(index! - 1)} className="inline-flex size-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label={t.previous}>
                 <ChevronLeft aria-hidden className="size-5" />
               </button>
               <p className="max-w-xs text-center text-xs text-white/70 sm:max-w-md sm:text-sm">{current.caption}</p>
-              <button type="button" onClick={() => show(index! + 1)} className="inline-flex size-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Next page">
+              <button type="button" onClick={() => show(index! + 1)} className="inline-flex size-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label={t.next}>
                 <ChevronRight aria-hidden className="size-5" />
               </button>
             </div>

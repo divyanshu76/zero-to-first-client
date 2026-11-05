@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { faqs } from "@/data/faq";
+import type { Dictionary } from "@/i18n/dictionaries/en";
+import { localePath, type Locale } from "@/i18n/config";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
-export function Faq() {
+export function Faq({ t, items, locale }: { t: Dictionary["faq"]; items: { q: string; a: string }[]; locale: Locale }) {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -14,12 +15,12 @@ export function Faq() {
         <div className="lg:sticky lg:top-28 lg:self-start">
           <SectionHeader
             id="faq-title"
-            title="Questions, answered plainly"
-            intro={<>Answers come from the book itself. Can&apos;t find yours? <a href="/contact" className="link-underline font-semibold text-ink">Contact support</a>.</>}
+            title={t.title}
+            intro={<>{t.introBefore}<a href={localePath(locale, "/contact")} className="link-underline font-semibold text-ink">{t.introLink}</a>{t.introAfter}</>}
           />
         </div>
         <ul className="divide-y divide-line border-y border-line">
-          {faqs.map((f, i) => {
+          {items.map((f, i) => {
             const isOpen = open === i;
             return (
               <li key={f.q}>

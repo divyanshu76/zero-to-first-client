@@ -15,9 +15,10 @@
   --color-line: #e8e5ed;
   --color-line-strong: #d4d0da;
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, sans-serif;
-  --font-serif: var(--font-serif-accent), ui-serif, Georgia, serif;
+  /* --font-devanagari is defined only on Hindi pages; Latin glyphs still come from Inter/Manrope. */
+  --font-sans: var(--font-inter), var(--font-devanagari, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-devanagari, ui-sans-serif), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-serif: var(--font-serif-accent), var(--font-devanagari, ui-serif), ui-serif, Georgia, serif;
 
   --container-page: 80rem;
 
@@ -225,4 +226,29 @@
 .ticker:hover .ticker-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .ticker-track { animation: none; transform: none; }
+}
+
+/* CountUp: digits stay hidden until counting starts (no 142 → 0 jump at hydration).
+   If JS never runs, they appear after 3 s. Reduced motion: shown immediately by the component. */
+.js [data-countup]:not([data-state]) .countup-digits { opacity: 0; animation: countup-fallback 0s linear 3s forwards; }
+@keyframes countup-fallback { to { opacity: 1; } }
+
+/* ── Hindi typography ──────────────────────────────────────────
+   Devanagari needs more vertical room (matras sit above and below the line) and no
+   negative tracking. These unlayered rules beat the Tailwind utility line-heights. */
+html[lang="hi"] body { line-height: 1.7; }
+html[lang="hi"] :is(h1, h2, h3, h4, h5) { letter-spacing: 0; line-height: 1.3; }
+html[lang="hi"] h1 { line-height: 1.22; }
+html[lang="hi"] :is(p, li, dd) { overflow-wrap: break-word; }
+/* The display serif has no Devanagari glyphs: keep the violet accent but avoid a synthesised
+   (faux) italic on Hindi text. */
+html[lang="hi"] h1 .italic { font-family: var(--font-display); font-style: normal; font-weight: 800; letter-spacing: 0; }
+/* The viewer centres the book at 76% of the stage height; its soft shadow extends past the
+   iframe's right and bottom edges and would be clipped into a hard line. Fade only those two
+   edges, starting just beyond the book itself, so the shadow dissolves instead. */
+.ztfc-book-scene {
+  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%), linear-gradient(to right, #000 84%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 88%, transparent 100%), linear-gradient(to right, #000 84%, transparent 100%);
+  mask-composite: intersect;
 }

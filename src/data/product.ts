@@ -73,14 +73,14 @@ export const product = {
   contactUrl: "/contact",
 } as const;
 
-/** Verified product facts, used by the facts strip, pricing, the OG image and JSON-LD. */
+/** Verified product facts. Their labels are the matching `stats` keys in the dictionaries. */
 export const stats = [
-  { value: 142, label: "Pages" },
-  { value: 10, label: "Chapters" },
-  { value: 141, label: "AI prompts" },
-  { value: 20, label: "Templates" },
-  { value: 7, label: "Calculator sheets" },
-  { value: 24, label: "Diagrams" },
+  { value: 142, key: "pages" },
+  { value: 10, key: "chapters" },
+  { value: 141, key: "prompts" },
+  { value: 20, key: "templates" },
+  { value: 7, key: "calculators" },
+  { value: 24, key: "diagrams" },
 ] as const;
 
 /**
