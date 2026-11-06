@@ -25,6 +25,8 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
   const [error, setError] = useState<ErrorKey | null>(null);
   const [fieldError, setFieldError] = useState<"name" | "email" | "phone" | null>(null);
   const [errorCode, setErrorCode] = useState("");
+  // Set only after the SERVER accepted an allowlisted email in Test Mode (create-order returned 201).
+  const [ownerTest, setOwnerTest] = useState(false);
   const busy = useRef(false);
   const ids = { title: useId(), name: useId(), email: useId(), phone: useId(), phoneHint: useId(), hint: useId(), err: useId() };
 
@@ -60,7 +62,7 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
     busy.current = true;
     setPhase("starting");
 
-    let order: { orderId: string; razorpayOrderId: string; amount: number; currency: string };
+    let order: { orderId: string; razorpayOrderId: string; amount: number; currency: string; ownerTest?: boolean };
     let Razorpay: Awaited<ReturnType<typeof loadRazorpay>>;
     try {
       [order, Razorpay] = await Promise.all([
@@ -121,6 +123,7 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
     rzp.on("payment.failed", () => {
       failed = true; // Razorpay keeps its window open so the buyer can retry
     });
+    setOwnerTest(order.ownerTest === true);
     setPhase("paying");
     rzp.open();
   }
@@ -192,7 +195,11 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
           {phase === "starting" ? t.starting : phase === "verifying" ? t.verifying : t.pay}
         </button>
 
-        {config.mode === "test" ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{t.testNote}</p> : null}
+        {ownerTest ? (
+          <p role="status" className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold leading-relaxed text-emerald-900" data-testid="owner-test-note">{t.ownerTest}</p>
+        ) : config.mode === "test" ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{t.testNote}</p>
+        ) : null}
         <p className="mt-3 text-xs leading-relaxed text-ink-2">{t.secure}</p>
         <p className="mt-2 text-xs leading-relaxed text-ink-2">
           {t.alreadyBought}{" "}

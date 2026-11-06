@@ -37,7 +37,8 @@ export async function POST(request: Request) {
 
   // While the merchant account is under review, Test Mode checkout is limited to the owner's test addresses.
   if (status.mode === "test" && !isTestAllowed(email)) {
-    return fail(403, "checkout_restricted", "Checkout is in test mode and isn't open to customers yet.");
+    // Server-side gate: in Test Mode only CHECKOUT_TEST_EMAILS may create orders (never decided by the browser).
+    return fail(403, "checkout_restricted", "Checkout is in Test Mode and isn't open to customers yet: only the store's registered test email can pay right now.");
   }
 
   const store = getStore();
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     if (rzp.amount !== PRODUCT.amount || rzp.currency !== PRODUCT.currency) throw new Error("Razorpay order amount mismatch");
     await store.createOrder({ id, productId: status.mode === "test" ? `${PRODUCT.id}:test` : PRODUCT.id, customerName: name, customerEmail: email, customerPhone: phone, locale, amount: PRODUCT.amount, currency: PRODUCT.currency, razorpayOrderId: rzp.id });
 
-    return json({ orderId: id, razorpayOrderId: rzp.id, contact: phone, amount: PRODUCT.amount, currency: PRODUCT.currency, mode: status.mode }, 201);
+    return json({ orderId: id, razorpayOrderId: rzp.id, contact: phone, ownerTest: status.mode === "test", amount: PRODUCT.amount, currency: PRODUCT.currency, mode: status.mode }, 201);
   } catch (e) {
     console.error(`[commerce] create-order failed: ${(e as Error).message}`);
     return fail(502, "order_failed", "We couldn't start the payment. Please try again in a moment.");

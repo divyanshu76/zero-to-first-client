@@ -104,6 +104,20 @@ test.describe("orders", () => {
     }
   });
 
+  test("Test Mode: an allow-listed email gets a ₹599 test order; any other email is refused by the server", async () => {
+    const ok = await createOrder(newEmail("owner-test"));
+    expect(ok.res.status()).toBe(201);
+    expect(ok.body).toMatchObject({ amount: 59900, currency: "INR", ownerTest: true });
+    const orders = (await (await mock.get("/__control/orders")).json()) as { id: string; requested: { amount: number } }[];
+    expect(orders.find((o) => o.id === ok.body.razorpayOrderId)?.requested.amount).toBe(59900);
+    // Not allow-listed (including case/space variations of an outside address): refused before any Razorpay call.
+    for (const email of [`someone-${rid()}@gmail.com`, `  Visitor-${rid()}@Example.com `]) {
+      const no = await createOrder(email);
+      expect(no.res.status()).toBe(403);
+      expect(no.body.error).toBe("checkout_restricted");
+    }
+  });
+
   test("Test Mode checkout is restricted to allow-listed test emails", async () => {
     const { res, body } = await createOrder(`someone-${rid()}@gmail.com`);
     expect(res.status()).toBe(403);
@@ -808,6 +822,22 @@ test.describe("checkout in the browser", () => {
     await expect(dialog.getByTestId("checkout-error")).toContainText("didn't go through", { timeout: 20000 });
   });
 
+  test("an allow-listed owner email opens Razorpay and sees the owner Test Mode note", async ({ page }) => {
+    await page.addInitScript(() => ((window as unknown as { __rzpMode: string }).__rzpMode = "dismiss"));
+    await page.goto(`${COMMERCE_URL}/#pricing`);
+    await page.locator('#pricing [data-checkout="razorpay"]').click();
+    const dialog = page.getByTestId("checkout-dialog");
+    await dialog.locator('input[name="name"]').fill("Store Owner");
+    await dialog.locator('input[name="email"]').fill(newEmail("owner-ui"));
+    await dialog.locator('input[name="phone"]').fill(MOBILE);
+    await dialog.locator('button[type="submit"]').click();
+    // The (stubbed) Razorpay window was opened with the server's ₹599 order…
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __rzpOptions?: { amount: number; currency: string; order_id: string } }).__rzpOptions), { timeout: 20000 }).toMatchObject({ amount: 59900, currency: "INR" });
+    // …and after closing it, the owner note is shown instead of the restriction.
+    await expect(dialog.getByTestId("owner-test-note")).toContainText("Owner testing is enabled. No real payment will be collected.", { timeout: 20000 });
+    await expect(dialog.getByTestId("checkout-error")).not.toContainText("isn't open to customers");
+  });
+
   test("an email outside the test allowlist can't check out", async ({ page }) => {
     await page.goto(`${COMMERCE_URL}/#pricing`);
     await page.locator('#pricing [data-checkout="razorpay"]').click();
@@ -816,7 +846,11 @@ test.describe("checkout in the browser", () => {
     await dialog.locator('input[name="email"]').fill("customer@gmail.com");
     await dialog.locator('input[name="phone"]').fill(MOBILE);
     await dialog.locator('button[type="submit"]').click();
-    await expect(dialog.getByTestId("checkout-error")).toContainText("test mode", { timeout: 20000 });
+    await expect(dialog.getByTestId("checkout-error")).toContainText("Test Mode", { timeout: 20000 });
+    await expect(dialog.getByTestId("checkout-error")).toContainText("only the store's registered test email can pay");
+    // Razorpay was never opened for a refused email.
+    expect(await page.evaluate(() => (window as unknown as { __rzpOptions?: unknown }).__rzpOptions)).toBeUndefined();
+    await expect(dialog.getByTestId("owner-test-note")).toHaveCount(0);
   });
 
   test("success page without a valid link explains what to do", async ({ page }) => {
