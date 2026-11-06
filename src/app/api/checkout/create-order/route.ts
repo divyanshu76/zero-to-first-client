@@ -1,8 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { after } from "next/server";
 import { PRODUCT, checkoutStatus, isTestAllowed } from "@/lib/commerce/config";
-import { sendEmail } from "@/lib/commerce/email";
-import { accessUrl, issueAccessToken } from "@/lib/commerce/fulfil";
 import { badRequest, cleanEmail, cleanLocale, cleanName, cleanPhone, crossSite, fail, json, readJson, sameOrigin } from "@/lib/commerce/http";
 import { clientIp, rateLimit, tooMany } from "@/lib/commerce/rate-limit";
 import { createRazorpayOrder } from "@/lib/commerce/razorpay";
@@ -45,22 +42,8 @@ export async function POST(request: Request) {
 
   const store = getStore();
   try {
-    // Duplicate purchase: the buyer already owns it. Send a fresh link instead of charging again.
-    const owned = await store.paidOrdersByEmail(email);
-    if (owned.length > 0) {
-      const o = owned[0];
-      const rlr = rateLimit(`relink:${email}`, 3, 60 * 60_000);
-      if (rlr.ok) {
-        after(async () => {
-          const token = await issueAccessToken(o.id);
-          await sendEmail({ to: o.customerEmail, name: o.customerName, locale, accessUrl: accessUrl(token, locale), orderId: o.id, kind: "relink" }, `relink-${o.id}-${Math.floor(Date.now() / 60_000)}`).catch((e) =>
-            console.error(`[commerce] relink email failed for ${o.id}: ${(e as Error).message}`),
-          );
-        });
-      }
-      return fail(409, "already_purchased", "This email already has the ebook. We've sent a fresh download link to it.");
-    }
-
+    // No "already purchased" check here: answering differently for existing buyers would reveal
+    // who has bought. Buyers who lost their link use /api/purchase/resend (identical replies).
     const id = `ord_${randomBytes(12).toString("hex")}`;
     const rzp = await createRazorpayOrder(id, { internal_order_id: id, product: PRODUCT.id });
     if (rzp.amount !== PRODUCT.amount || rzp.currency !== PRODUCT.currency) throw new Error("Razorpay order amount mismatch");

@@ -12,7 +12,7 @@
    browser and on the server, stored as `+91…`, and prefilled into Razorpay so its window doesn't ask again) → `POST /api/checkout/create-order`.
    The server validates input, rate-limits, applies the test allowlist, and creates a Razorpay order for
    **59900 paise INR**, fixed in `src/lib/commerce/config.ts`. Any amount from the browser is ignored.
-   An email that already owns the ebook gets a fresh link instead of a second charge.
+   Checkout answers every email the same way (no "already purchased" reply, which would reveal buyers); existing buyers use the "Get a fresh download link" form instead.
 3. **Razorpay Standard Checkout** (`checkout.razorpay.com/v1/checkout.js`) opens with that `order_id`.
    Only the public Key ID reaches the browser.
 4. **`POST /api/checkout/verify`** checks `HMAC_SHA256(order_id|payment_id, key_secret)` in constant time,

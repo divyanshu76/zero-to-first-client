@@ -498,6 +498,8 @@ export const en = {
     policiesBefore: "By paying you agree to the ",
     policiesAfter: ".",
     policyLinks: ["Terms", "Refund", "Delivery", "Privacy"],
+    alreadyBought: "Already bought it?",
+    alreadyBoughtLink: "Get a fresh download link",
     errors: {
       invalid_name: "Please enter your name (2–100 characters).",
       invalid_email: "Please enter a valid email address.",

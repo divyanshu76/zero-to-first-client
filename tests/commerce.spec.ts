@@ -323,12 +323,16 @@ test.describe("access and downloads", () => {
     expect((await status(tokenFrom(mails[1].text)!)).status).toBe("paid");
   });
 
-  test("buying again with an email that already owns the ebook sends a link instead of charging", async () => {
-    const email = newEmail("again");
-    await paidToken(email);
-    const { res, body } = await createOrder(email);
-    expect(res.status()).toBe(409);
-    expect(body.error).toBe("already_purchased");
+  test("checkout never reveals whether an email has already bought the ebook", async () => {
+    const owner = newEmail("again");
+    await paidToken(owner);
+    const a = await createOrder(owner);
+    const b = await createOrder(newEmail("fresh"));
+    // Same status and the same response shape for an existing buyer and a new one.
+    expect(a.res.status()).toBe(201);
+    expect(b.res.status()).toBe(201);
+    expect(Object.keys(a.body).sort()).toEqual(Object.keys(b.body).sort());
+    expect(a.body.error).toBeUndefined();
   });
 });
 

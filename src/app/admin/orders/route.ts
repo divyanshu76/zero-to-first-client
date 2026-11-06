@@ -39,22 +39,26 @@ const HEADERS = {
   "x-content-type-options": "nosniff",
 };
 
-// Brute-force protection: the lockout is checked BEFORE the password, so a locked-out client is
-// refused even with the right password; only failed attempts count. Per IP, plus a global cap
-// that slows guessing spread across many IPs. (In-memory: per server instance.)
+// Brute-force protection (in memory, per server instance). Only failed attempts count.
+// - Per IP: the lockout is checked BEFORE the password, so a locked-out IP is refused even with
+//   the right password.
+// - Globally: many failures across all IPs never lock the owner out; they only slow every attempt
+//   down, so distributed guessing gets expensive while a correct password still works.
 const FAIL_PER_IP = 10;
 const FAIL_IP_WINDOW = 15 * 60_000;
 const FAIL_GLOBAL = 200;
 const FAIL_GLOBAL_WINDOW = 60 * 60_000;
 
-function gate(request: Request): Response | { user: string } {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function gate(request: Request): Promise<Response | { user: string }> {
   if (!adminCredentials()) return new Response("Not found", { status: 404, headers: NO_STORE });
   const ipKey = `admin-fail:${clientIp(request)}`;
   const locked = isLimited(ipKey, FAIL_PER_IP);
-  const lockedAll = isLimited("admin-fail:all", FAIL_GLOBAL);
-  if (locked.limited || lockedAll.limited) {
-    return new Response("Too many failed sign-in attempts. Try again later.", { status: 429, headers: { ...NO_STORE, "retry-after": String(Math.max(locked.retryAfter, lockedAll.retryAfter)) } });
+  if (locked.limited) {
+    return new Response("Too many failed sign-in attempts. Try again later.", { status: 429, headers: { ...NO_STORE, "retry-after": String(locked.retryAfter) } });
   }
+  if (isLimited("admin-fail:all", FAIL_GLOBAL).limited) await sleep(2000);
   const a = authorised(request);
   if (a === "disabled") return new Response("Not found", { status: 404, headers: NO_STORE });
   if (!a) {
@@ -265,13 +269,13 @@ async function render(request: Request, user: string, notice: { tone: "ok" | "ba
 }
 
 export async function GET(request: Request) {
-  const g = gate(request);
+  const g = await gate(request);
   if (g instanceof Response) return g;
   return render(request, g.user);
 }
 
 export async function POST(request: Request) {
-  const g = gate(request);
+  const g = await gate(request);
   if (g instanceof Response) return g;
   if (!sameOrigin(request)) return new Response("Request blocked", { status: 403, headers: NO_STORE });
   const form = await request.formData().catch(() => null);

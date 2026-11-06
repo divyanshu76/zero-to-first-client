@@ -195,6 +195,10 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
         {config.mode === "test" ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{t.testNote}</p> : null}
         <p className="mt-3 text-xs leading-relaxed text-ink-2">{t.secure}</p>
         <p className="mt-2 text-xs leading-relaxed text-ink-2">
+          {t.alreadyBought}{" "}
+          <a className="font-semibold text-violet underline-offset-4 hover:underline" href={href("/purchase/success")} data-testid="already-bought">{t.alreadyBoughtLink}</a>
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-ink-2">
           {t.policiesBefore}
           {(["/terms", "/refund", "/delivery", "/privacy"] as const).map((p, i) => (
             <span key={p}>

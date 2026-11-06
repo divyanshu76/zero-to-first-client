@@ -500,6 +500,8 @@ export const hi: Dictionary = {
     policiesBefore: "Pay करके आप इन नीतियों से सहमत होते हैं: ",
     policiesAfter: "।",
     policyLinks: ["शर्तें", "Refund", "Delivery", "Privacy"],
+    alreadyBought: "पहले ख़रीद चुके हैं?",
+    alreadyBoughtLink: "नया download link पाएँ",
     errors: {
       invalid_name: "कृपया अपना नाम लिखें (2–100 अक्षर)।",
       invalid_email: "कृपया सही email address लिखें।",
