@@ -278,6 +278,15 @@ test.describe("access and downloads", () => {
     expect(again.url).not.toBe(url);
   });
 
+  test("a paid order is not blocked after 10 downloads in a day (no per-order cap)", async () => {
+    const { token } = await paidToken();
+    for (let i = 0; i < 15; i++) {
+      const res = await api.post("/api/download", { data: { token } });
+      expect(res.status(), `download ${i + 1}`).toBe(200);
+      expect((await res.json()).url).toContain("/api/download/file?");
+    }
+  });
+
   test("12. an expired download URL is refused", async () => {
     const { orderId } = await paidToken();
     const exp = Math.floor(Date.now() / 1000) - 5;
@@ -639,6 +648,56 @@ test.describe("admin", () => {
 
   test("a successful sign-in doesn't use up the attempt budget", async () => {
     for (let i = 0; i < 12; i++) expect((await api.get("/admin/orders", { headers: auth() })).status()).toBe(200);
+  });
+
+  test("/admin asks for credentials, then redirects to /admin/orders; every section is protected", async () => {
+    expect((await api.get("/admin", { maxRedirects: 0 })).status()).toBe(401);
+    const home = await api.get("/admin", { headers: auth(), maxRedirects: 0 });
+    expect(home.status()).toBe(307);
+    expect(home.headers()["location"]).toBe("/admin/orders");
+    for (const section of ["overview", "customers", "payments", "ebook", "email"]) {
+      expect((await api.get(`/admin/${section}`)).status(), section).toBe(401);
+      const ok = await api.get(`/admin/${section}`, { headers: auth() });
+      expect(ok.status(), section).toBe(200);
+      expect(await ok.text()).toContain('aria-current="page"');
+    }
+    expect((await api.get("/admin/orders", { headers: auth() })).status()).toBe(200);
+    expect((await api.get("/admin/secrets", { headers: auth() })).status()).toBe(404);
+    expect((await api.get("/admin/secrets")).status()).toBe(404);
+  });
+
+  test("admin pages send Referrer-Policy same-origin, so form POSTs carry a real Origin", async () => {
+    const res = await api.get("/admin/email", { headers: auth() });
+    expect(res.headers()["referrer-policy"]).toBe("same-origin");
+  });
+
+  test("'Origin: null' is accepted only with Sec-Fetch-Site: same-origin; cross-site stays blocked", async () => {
+    const post = (headers: Record<string, string>) => api.post("/admin/email", { headers: { ...auth(), ...headers }, form: { action: "noop" } });
+    expect(await (await post({ origin: "null", "sec-fetch-site": "same-origin" })).text()).toContain("tick the confirmation box");
+    expect((await post({ origin: "null" })).status()).toBe(403);
+    expect((await post({ origin: "null", "sec-fetch-site": "cross-site" })).status()).toBe(403);
+    expect((await post({ origin: "https://evil.example" })).status()).toBe(403);
+    expect((await post({ "sec-fetch-site": "cross-site" })).status()).toBe(403);
+  });
+
+  test("a test email creates no order, no receipt and no ebook link", async () => {
+    const ordersBefore = ((await (await mock.get("/__control/orders")).json()) as unknown[]).length;
+    await api.post("/admin/email", { headers: auth(), form: { action: "test-email", confirm: "yes" } });
+    const ordersAfter = ((await (await mock.get("/__control/orders")).json()) as unknown[]).length;
+    expect(ordersAfter).toBe(ordersBefore);
+    const tests = (await emailsTo("owner@buyers.test")).filter((m) => m.subject === "CRAFT & CODE — Email Integration Test");
+    for (const m of tests) {
+      expect(m.attachments.map((a) => a.filename)).toEqual(["craft-and-code-logo.jpg"]);
+      expect(m.text).not.toMatch(/purchase\/success#t=|Payment-Receipt/);
+    }
+  });
+
+  test("Test Mode orders are labelled TEST and kept out of real revenue", async () => {
+    const { body } = await createOrder(newEmail("label"));
+    const detail = await (await api.get(`/admin/orders?view=orders&id=${body.orderId}`, { headers: auth() })).text();
+    expect(detail).toContain(">TEST<");
+    const cfg = await (await api.get("/api/checkout/config")).json();
+    expect(cfg.mode).toBe("test");
   });
 
   test("logout answers 401 so the browser drops its credentials", async () => {

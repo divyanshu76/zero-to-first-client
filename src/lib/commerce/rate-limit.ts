@@ -2,8 +2,8 @@ import "server-only";
 
 /**
  * Fixed-window rate limiter kept in memory. On serverless hosts each instance has its own
- * window, so this is a first line of defence; the database-backed per-order download
- * counter (store.recordDownload) is the hard limit.
+ * window, so this is a first line of defence against automated abuse. (Paid buyers have no
+ * per-order download cap; store.recordDownload only counts downloads for the dashboard.)
  */
 const g = globalThis as unknown as { __ztfcRate?: Map<string, { count: number; reset: number }> };
 const buckets = () => (g.__ztfcRate ??= new Map());

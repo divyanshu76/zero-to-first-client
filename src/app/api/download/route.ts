@@ -1,4 +1,3 @@
-import { MAX_DOWNLOADS_PER_DAY } from "@/lib/commerce/config";
 import { resolveToken } from "@/lib/commerce/fulfil";
 import { badRequest, crossSite, fail, json, readJson, sameOrigin } from "@/lib/commerce/http";
 import { clientIp, rateLimit, tooMany } from "@/lib/commerce/rate-limit";
@@ -6,7 +5,7 @@ import { StorageError, signedEbookUrl } from "@/lib/commerce/storage";
 import { getStore } from "@/lib/commerce/store";
 
 /**
- * POST /api/download { token } → { url, expiresAt }
+ * POST /api/download { token } → { url, expiresAt }  (unlimited downloads for a paid order)
  * Entitlement is checked on the server for every request; the returned URL is signed and
  * expires after 15 minutes. A new one is minted each time.
  */
@@ -24,12 +23,15 @@ export async function POST(request: Request) {
       if (ent.reason === "not_paid") return fail(403, "not_paid", "This order isn't paid, so the download isn't available.");
       return fail(403, "unauthorized", "This download link isn't valid.");
     }
-    const day = new Date().toISOString().slice(0, 10);
-    if (!(await getStore().recordDownload(ent.order.id, day, MAX_DOWNLOADS_PER_DAY))) {
-      return fail(429, "download_limit", "You've reached today's download limit. Please try again tomorrow or contact support.");
-    }
+    // No per-order download cap: a paid buyer can download whenever needed. Each request still needs
+    // a valid token for a paid (not refunded) order, gets a fresh 15-minute signed URL, and is
+    // throttled per IP above. The counter below is for the dashboard only.
     const origin = new URL(request.url).origin;
-    return json(await signedEbookUrl(ent.order.id, origin));
+    const signed = await signedEbookUrl(ent.order.id, origin);
+    await getStore()
+      .recordDownload(ent.order.id, new Date().toISOString().slice(0, 10))
+      .catch((e) => console.warn(`[commerce] download counter not updated for ${ent.order.id}: ${(e as Error).message}`));
+    return json(signed);
   } catch (e) {
     if (e instanceof StorageError) {
       console.error(`[commerce] storage: ${e.message}`);

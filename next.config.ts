@@ -16,10 +16,15 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
         ],
+      },
+      {
+        // Public pages: Razorpay's checkout needs to see this site's origin. /admin sets its own
+        // stricter "same-origin" policy (see admin-handler.ts), so it is excluded here.
+        source: "/:path((?!admin(?:/|$)).*)",
+        headers: [{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }],
       },
       {
         source: "/3d-assets/:path*",

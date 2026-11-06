@@ -46,7 +46,7 @@
    (never sent to servers or logs), removes it from the address bar, and asks `POST /api/purchase/status`.
    A pending payment is reconciled directly with Razorpay (delayed webhook).
 8. **Download**: `POST /api/download` checks the token (stored hashed, valid 30 days), that the order is
-   **paid** (refunds revoke access), and a per-order limit of 10 a day. It then returns a **15-minute signed URL**
+   **paid** (refunds revoke access). There is no per-order download cap; requests are throttled per IP against automated abuse. It then returns a **15-minute signed URL**
    (Supabase Storage private bucket, or the HMAC-signed local driver in development). Each click mints a new one.
 9. **Lost link**: `POST /api/purchase/resend` emails a fresh link; the response is identical whether or not
    the email bought anything.

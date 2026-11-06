@@ -59,7 +59,8 @@ export interface OrderStore {
   claimOwnerEmail(orderId: string): Promise<boolean>;
   recordOwnerEmailResult(orderId: string, ok: boolean, error?: string): Promise<void>;
   /** Atomic per-day download counter; false when the daily limit is reached. */
-  recordDownload(orderId: string, day: string, maxPerDay: number): Promise<boolean>;
+  /** Counts a download for the dashboard. Analytics only: it never blocks a paid buyer. */
+  recordDownload(orderId: string, day: string): Promise<void>;
   listOrders(limit: number): Promise<Order[]>;
   /** Most recent verified webhook events (only signature-verified events are ever stored). */
   listWebhookEvents(limit: number): Promise<{ eventId: string; type: string; receivedAt: string }[]>;
@@ -147,13 +148,11 @@ class MemoryStore implements OrderStore {
     if (!o) return;
     o.ownerEmailStatus = ok ? "sent" : "failed"; o.ownerEmailSentAt = ok ? now() : o.ownerEmailSentAt; o.lastOwnerEmailError = ok ? null : (error ?? "unknown").slice(0, 300);
   }
-  async recordDownload(orderId: string, day: string, maxPerDay: number) {
+  async recordDownload(orderId: string, day: string) {
     const o = this.m.orders.get(orderId);
-    if (!o) return false;
+    if (!o) return;
     if (o.downloadDay !== day) { o.downloadDay = day; o.downloadsToday = 0; }
-    if (o.downloadsToday >= maxPerDay) return false;
     o.downloadsToday += 1; o.downloadCount += 1; o.lastDownloadAt = now();
-    return true;
   }
   async listOrders(limit: number) { return [...this.m.orders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((o) => ({ ...o })); }
   async paidOrdersByEmail(email: string) { return [...this.m.orders.values()].filter((o) => o.status === "paid" && o.customerEmail === email).map((o) => ({ ...o })); }
@@ -255,8 +254,10 @@ class SupabaseStore implements OrderStore {
       await this.rpc("record_owner_email_result", { p_order_id: orderId, p_ok: ok, p_error: ok ? null : (error ?? "unknown").slice(0, 300) });
     } catch {}
   }
-  async recordDownload(orderId: string, day: string, maxPerDay: number) {
-    return (await this.rpc<boolean>("record_download", { p_order_id: orderId, p_day: day, p_max: maxPerDay })) === true;
+  async recordDownload(orderId: string, day: string) {
+    // The existing SQL function takes a per-day maximum; an unreachable one keeps it a pure counter
+    // (no schema change needed).
+    await this.rpc("record_download", { p_order_id: orderId, p_day: day, p_max: 2147483647 });
   }
   async listOrders(limit: number) { return (await this.req<Row[]>(`/orders_with_delivery?order=created_at.desc&limit=${limit}`)).map(toOrder); }
   async paidOrdersByEmail(email: string) { return (await this.req<Row[]>(`/orders_with_delivery?customer_email=eq.${encodeURIComponent(email)}&payment_status=eq.paid`)).map(toOrder); }

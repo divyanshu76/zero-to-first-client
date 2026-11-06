@@ -45,9 +45,10 @@ export async function POST(request: Request) {
     // No "already purchased" check here: answering differently for existing buyers would reveal
     // who has bought. Buyers who lost their link use /api/purchase/resend (identical replies).
     const id = `ord_${randomBytes(12).toString("hex")}`;
+    // Test Mode orders carry a ":test" product suffix so the dashboard can label and exclude them from revenue.
     const rzp = await createRazorpayOrder(id, { internal_order_id: id, product: PRODUCT.id });
     if (rzp.amount !== PRODUCT.amount || rzp.currency !== PRODUCT.currency) throw new Error("Razorpay order amount mismatch");
-    await store.createOrder({ id, productId: PRODUCT.id, customerName: name, customerEmail: email, customerPhone: phone, locale, amount: PRODUCT.amount, currency: PRODUCT.currency, razorpayOrderId: rzp.id });
+    await store.createOrder({ id, productId: status.mode === "test" ? `${PRODUCT.id}:test` : PRODUCT.id, customerName: name, customerEmail: email, customerPhone: phone, locale, amount: PRODUCT.amount, currency: PRODUCT.currency, razorpayOrderId: rzp.id });
 
     return json({ orderId: id, razorpayOrderId: rzp.id, contact: phone, amount: PRODUCT.amount, currency: PRODUCT.currency, mode: status.mode }, 201);
   } catch (e) {

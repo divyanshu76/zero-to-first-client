@@ -23,7 +23,7 @@ export const delivery: PolicyContent = {
         <ul>
           <li>Delivery starts only after the payment provider confirms your payment to our server. A browser &ldquo;payment successful&rdquo; screen alone doesn&apos;t trigger delivery.</li>
           <li>You&apos;ll receive an email, at the address you entered at checkout, with secure links to download the files.</li>
-          <li>Links are tied to your order, to prevent unauthorised sharing. The access link in your email works for 30 days; each time you use it, a fresh download link valid for 15 minutes is created, up to 10 downloads a day. Please download and save the files to your device when you receive them.</li>
+          <li>Links are tied to your order, to prevent unauthorised sharing. The access link in your email works for 30 days; each time you use it, a fresh download link valid for 15 minutes is created. There is no limit on how often you can download. Please download and save the files to your device when you receive them.</li>
           <li>Lost or expired link? Enter the email you bought with on the <L to="/purchase/success">purchase page</L> and a fresh link is emailed to you.</li>
         </ul>
         <h2>4. If the email doesn&apos;t arrive</h2>
@@ -62,7 +62,7 @@ export const delivery: PolicyContent = {
         <ul>
           <li>Delivery तभी शुरू होती है जब payment provider हमारे server को आपके payment की पुष्टि करता है। Browser में सिर्फ़ &ldquo;payment successful&rdquo; screen दिखने से delivery शुरू नहीं होती।</li>
           <li>Checkout में दिए गए email address पर आपको files download करने के सुरक्षित links वाला email मिलेगा।</li>
-          <li>बिना अनुमति share होने से रोकने के लिए links आपके order से जुड़े होते हैं। Email वाला access link 30 दिन तक काम करता है; हर बार इस्तेमाल करने पर 15 मिनट के लिए valid नया download link बनता है, दिन में अधिकतम 10 downloads तक। Files मिलते ही download करके अपने device में save कर लें।</li>
+          <li>बिना अनुमति share होने से रोकने के लिए links आपके order से जुड़े होते हैं। Email वाला access link 30 दिन तक काम करता है; हर बार इस्तेमाल करने पर 15 मिनट के लिए valid नया download link बनता है। आप जितनी बार चाहें download कर सकते हैं। Files मिलते ही download करके अपने device में save कर लें।</li>
           <li>Link खो गया या expire हो गया? <L to="/purchase/success">Purchase page</L> पर वह email लिखें जिससे ख़रीदा था, और नया link आपको email कर दिया जाएगा।</li>
         </ul>
         <h2>4. अगर email न आए</h2>

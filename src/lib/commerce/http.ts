@@ -24,12 +24,23 @@ export async function readJson(request: Request): Promise<Record<string, unknown
 /** Browser-facing POSTs must come from this site (blocks cross-site form/fetch abuse). */
 export function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin) return request.headers.get("sec-fetch-site") !== "cross-site";
+  const site = request.headers.get("sec-fetch-site");
+  if (!origin) return site !== "cross-site";
+  // Browsers send the literal "Origin: null" for privacy-sensitive contexts (e.g. a page served with
+  // Referrer-Policy: no-referrer). Accept it only when the browser's own Sec-Fetch-Site vouches
+  // that the request comes from this site; a cross-site page can't forge that header.
+  if (origin === "null") return site === "same-origin";
   try {
     return new URL(origin).host === (request.headers.get("x-forwarded-host") ?? request.headers.get("host"));
   } catch {
     return false;
   }
+}
+
+/** Safe diagnostic for a blocked request: header shapes only, never values that could identify a user. */
+export function blockedReason(request: Request) {
+  const origin = request.headers.get("origin");
+  return `origin=${origin === null ? "absent" : origin === "null" ? "null" : "other-host"} sec-fetch-site=${request.headers.get("sec-fetch-site") ?? "absent"}`;
 }
 
 export const crossSite = () => fail(403, "forbidden", "Request blocked.");

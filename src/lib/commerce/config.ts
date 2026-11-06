@@ -25,7 +25,8 @@ export function razorpayKeys() {
   const keyId = env("RAZORPAY_KEY_ID");
   const keySecret = env("RAZORPAY_KEY_SECRET");
   const webhookSecret = env("RAZORPAY_WEBHOOK_SECRET");
-  const mode: CheckoutMode | null = keyId ? (keyId.startsWith("rzp_live_") ? "live" : "test") : null;
+  // Only Razorpay's own prefixes count; anything else is "unknown" and keeps checkout closed.
+  const mode: CheckoutMode | "unknown" | null = keyId ? (keyId.startsWith("rzp_live_") ? "live" : keyId.startsWith("rzp_test_") ? "test" : "unknown") : null;
   return { keyId, keySecret, webhookSecret, mode };
 }
 
@@ -51,15 +52,15 @@ export const appOrigin = () => (env("APP_ORIGIN") ?? env("NEXT_PUBLIC_SITE_URL")
 /** Signed download URLs expire after 15 minutes; the access link itself lasts 30 days. */
 export const SIGNED_URL_TTL_SECONDS = 15 * 60;
 export const ACCESS_TOKEN_TTL_DAYS = 30;
-export const MAX_DOWNLOADS_PER_DAY = 10;
 
 /**
  * Checkout is OFF unless CHECKOUT_ENABLED=true. In Test Mode it additionally requires an
  * email allowlist (CHECKOUT_TEST_EMAILS), so a test card on the public site can't be used
  * to obtain the real ebook. Live Mode is refused unless CHECKOUT_LIVE_APPROVED=true.
  */
-export function checkoutStatus(): { enabled: boolean; mode: CheckoutMode | null; reason?: string } {
+export function checkoutStatus(): { enabled: boolean; mode: CheckoutMode | "unknown" | null; reason?: string } {
   const { keyId, keySecret, mode } = razorpayKeys();
+  if (mode === "unknown") return { enabled: false, mode, reason: "unrecognised-key" };
   if (env("CHECKOUT_ENABLED") !== "true") return { enabled: false, mode, reason: "disabled" };
   if (!keyId || !keySecret) return { enabled: false, mode, reason: "missing-keys" };
   if (mode === "live" && env("CHECKOUT_LIVE_APPROVED") !== "true") return { enabled: false, mode, reason: "live-not-approved" };

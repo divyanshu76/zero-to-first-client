@@ -25,6 +25,8 @@ const NAV: [View, string, string][] = [
 const icon = (d: string, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 
 const STATUS_TONE: Record<string, string> = { paid: "ok", sent: "ok", processing: "warn", pending: "muted", sending: "warn", failed: "bad", cancelled: "muted", refunded: "bad", skipped: "muted" };
+export const isTestOrder = (o: Pick<Order, "productId">) => o.productId.endsWith(":test");
+export const testTag = (o: Pick<Order, "productId">) => (isTestOrder(o) ? ' <span class="b warn" title="Razorpay Test Mode order: no real money">TEST</span>' : "");
 export const badge = (s: string) => `<span class="b ${STATUS_TONE[s] ?? "muted"}">${esc(s)}</span>`;
 
 const CSS = `
@@ -59,7 +61,7 @@ export function layout(opts: { view: View; title: string; user: string; status: 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"><style>${CSS}</style></head>
 <body><div class="app">
 <aside class="side"><a class="brand" href="/admin/orders">${logo}<span><b>CRAFT &amp; CODE</b><small>Admin · Zero to First Client</small></span></a>
-<nav class="nav" aria-label="Admin">${NAV.map(([v, label, d]) => `<a href="/admin/orders?view=${v}"${v === opts.view ? ' aria-current="page"' : ""}>${icon(d)}${label}</a>`).join("")}</nav>
+<nav class="nav" aria-label="Admin">${NAV.map(([v, label, d]) => `<a href="${v === "overview" ? "/admin/orders" : v === "orders" ? "/admin/orders?view=orders" : `/admin/${v}`}"${v === opts.view ? ' aria-current="page"' : ""}>${icon(d)}${label}</a>`).join("")}</nav>
 <div class="mode">Checkout <b>${esc(opts.status.checkout)}</b><br>Mode <b>${esc(opts.status.mode)}</b><br>Store <b>${esc(opts.status.store)}</b> · Files <b>${esc(opts.status.storage)}</b><br>Email <b>${esc(opts.status.email)}</b></div></aside>
 <div class="main"><header class="top"><h1>${esc(opts.title)}</h1><div class="who"><span class="chip"><span class="dot"></span>${esc(opts.user)}</span><a class="btn" href="/admin/logout">Log out</a></div></header>
 <main class="wrap">${opts.notice ? `<p class="note ${opts.notice.tone}" role="status">${esc(opts.notice.text)}</p>` : ""}${opts.body}</main></div></div></body></html>`;
@@ -71,7 +73,7 @@ export function ordersTable(rows: Order[], opts: { compact?: boolean } = {}) {
   if (!rows.length) return `<div class="tw"><div class="empty">No orders match.</div></div>`;
   return `<div class="tw"><table><thead><tr><th>Order</th><th>Customer</th>${opts.compact ? "" : "<th>Phone</th>"}<th class="r">Amount</th><th>Payment</th><th>Date (IST)</th><th>Downloads</th><th>Email</th></tr></thead><tbody>${rows
     .map(
-      (o) => `<tr><td><a href="/admin/orders?view=orders&amp;id=${esc(o.id)}"><code>${esc(o.id)}</code></a></td>
+      (o) => `<tr><td><a href="/admin/orders?view=orders&amp;id=${esc(o.id)}"><code>${esc(o.id)}</code></a>${testTag(o)}</td>
 <td>${esc(o.customerName)}<br><span class="m">${esc(o.customerEmail)}</span></td>${opts.compact ? "" : `<td class="nw">${esc(o.customerPhone ?? "—")}</td>`}
 <td class="r nw">${inr(o.amount)}</td><td>${badge(o.status)}</td><td class="nw">${ist(o.createdAt)}</td>
 <td>${o.downloadCount ? `${o.downloadCount}×` : '<span class="m">Not downloaded</span>'}</td><td>${badge(o.emailStatus)}</td></tr>`,
