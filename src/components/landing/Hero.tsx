@@ -2,10 +2,10 @@ import { discountPercent, formatPrice, pricing, stats } from "@/data/product";
 import type { Dictionary } from "@/i18n/dictionaries/en";
 import { fmt } from "@/i18n/config";
 import { BookShowcase } from "./BookShowcase";
-import { BuyButton } from "@/components/ui/BuyButton";
+import { BuyButton, type BuyStrings } from "@/components/ui/BuyButton";
 import { CountUp } from "@/components/ui/CountUp";
 
-export function Hero({ t, stat, book, buy }: { t: Dictionary["hero"]; stat: Dictionary["stats"]; book: Dictionary["book"]; buy: Dictionary["buy"] }) {
+export function Hero({ t, stat, book, buy }: { t: Dictionary["hero"]; stat: Dictionary["stats"]; book: Dictionary["book"]; buy: BuyStrings }) {
   const inr = pricing.INR;
   const off = discountPercent(inr);
   return (
@@ -40,7 +40,7 @@ export function Hero({ t, stat, book, buy }: { t: Dictionary["hero"]; stat: Dict
           ) : null}
 
           <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-            <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} />
+            <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} checkout={buy.checkout} />
             <a
               href="#preview"
               className="press inline-flex h-14 items-center rounded-full border border-line-strong px-7 font-display font-semibold whitespace-nowrap text-ink hover:border-ink hover:bg-white"

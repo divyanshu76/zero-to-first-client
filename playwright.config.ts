@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { COMMERCE_PORT, MOCK_PORT, commerceEnv } from "./tests/commerce/env";
 
 /**
  * Responsive / reflow regression tests. They run against the production build:
@@ -21,5 +22,11 @@ export default defineConfig({
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
-    : { command: `npm run start -- -p ${PORT}`, url: baseURL, reuseExistingServer: true, timeout: 120_000 },
+    : [
+        // The public site as visitors see it today: on-site checkout switched off.
+        { command: `npm run start -- -p ${PORT}`, url: baseURL, reuseExistingServer: true, timeout: 120_000, env: { CHECKOUT_ENABLED: "false", COMMERCE_STORE: "memory", COMMERCE_STORAGE: "local", COMMERCE_EMAIL: "outbox", OWNER_EMAIL: "" } },
+        // Mock Razorpay + Resend APIs, and a second server with Test Mode checkout wired to them.
+        { command: `node tests/commerce/mock-server.mjs`, url: `http://127.0.0.1:${MOCK_PORT}/__health`, reuseExistingServer: false, timeout: 30_000, env: { MOCK_PORT: String(MOCK_PORT) } },
+        { command: `npm run start -- -p ${COMMERCE_PORT}`, url: `http://localhost:${COMMERCE_PORT}`, reuseExistingServer: false, timeout: 120_000, env: commerceEnv },
+      ],
 });

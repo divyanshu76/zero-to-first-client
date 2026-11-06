@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   headers() {
     return [
       {
+        // Baseline hardening for every response. (HSTS is added by Vercel on its domains.)
+        // Permissions-Policy leaves "payment" alone: Razorpay's checkout frame needs it.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+        ],
+      },
+      {
         source: "/3d-assets/:path*",
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
@@ -20,6 +31,8 @@ const nextConfig: NextConfig = {
     ];
   },
   partialPrefetching: true,
+  // The paid ebook must never ship with the deployment, whatever a route traces.
+  outputFileTracingExcludes: { "/*": ["reference/**", "tests/**", "**/*.pdf", "**/*.docx", "**/*.xlsx", "**/*.zip", ".env*"] },
   turbopack: {
     rules: {
       "*.css": {

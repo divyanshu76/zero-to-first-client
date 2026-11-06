@@ -8,11 +8,11 @@ import { contactPath, policyPaths } from "@/data/content";
 import type { Dictionary } from "@/i18n/dictionaries/en";
 import { localePath, type Locale } from "@/i18n/config";
 import { Wordmark } from "@/components/ui/BookMockup";
-import { BuyButton } from "@/components/ui/BuyButton";
+import { BuyButton, type BuyStrings } from "@/components/ui/BuyButton";
 import { Reveal } from "@/components/ui/Reveal";
 import { BookShowcase } from "./BookShowcase";
 
-export function FinalCta({ t, buy, book }: { t: Dictionary["final"]; buy: Dictionary["buy"]; book: Dictionary["book"] }) {
+export function FinalCta({ t, buy, book }: { t: Dictionary["final"]; buy: BuyStrings; book: Dictionary["book"] }) {
   return (
     <section aria-labelledby="final-title" className="px-3 pb-3 sm:px-5 sm:pb-5">
       <div className="relative overflow-hidden rounded-[2rem] bg-ink text-white sm:rounded-[2.5rem]">
@@ -22,7 +22,7 @@ export function FinalCta({ t, buy, book }: { t: Dictionary["final"]; buy: Dictio
             <h2 id="final-title" className="text-[clamp(2rem,4.2vw,3.3rem)] leading-[1.04] font-extrabold">{t.title}</h2>
             <p className="mt-4 max-w-lg text-lg text-white/70">{t.body}</p>
             <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} variant="light" />
+              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} checkout={buy.checkout} variant="light" />
               {pricing.INR.amount !== null ? (
                 <p className="text-sm text-white/70">
                   <span className="font-semibold text-white">{formatPrice(pricing.INR.amount, "INR")}</span> {t.launchPrice}

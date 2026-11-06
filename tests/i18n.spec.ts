@@ -87,13 +87,26 @@ test("language switch: EN → हिन्दी → refresh → EN, keeping the
 });
 
 test("hero statistics count up from zero to the verified values", async ({ page }) => {
+  // Record, from the very first frame, every value a counter shows while it is counting. A fixed
+  // wait after load was flaky: when counting starts depends on hydration time and machine load.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __countupSeen: { value: number; final: number }[] };
+    w.__countupSeen = [];
+    const finals: Record<string, number> = {};
+    new MutationObserver(() => {
+      document.querySelectorAll<HTMLElement>("#top [data-countup]").forEach((el, i) => {
+        const final = (finals[i] ??= Number(el.querySelector(".sr-only")?.textContent));
+        if (el.dataset.state === "counting") w.__countupSeen.push({ value: Number(el.querySelector(".countup-digits")?.textContent), final });
+      });
+    }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["data-state"] });
+  });
   await page.goto("/");
   const digits = page.locator("#top [data-countup] .countup-digits");
   await expect(digits).toHaveCount(6);
-  // Mid-animation at least one number is below its final value…
-  await page.waitForTimeout(350);
-  const mid = await digits.allTextContents();
-  expect(mid.some((v, i) => Number(v) < [142, 10, 141, 20, 7, 24][i])).toBe(true);
+  // While counting, at least one number is shown below its final value…
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __countupSeen: { value: number; final: number }[] }).__countupSeen.some((s) => s.value < s.final)), { timeout: 8000 })
+    .toBe(true);
   // …and all settle on the real values. Screen readers always get the final value.
   await expect.poll(() => digits.allTextContents(), { timeout: 4000 }).toEqual(["142", "10", "141", "20", "7", "24"]);
   await expect(page.locator("#top [data-countup] .sr-only")).toHaveText(["142", "10", "141", "20", "7", "24"]);

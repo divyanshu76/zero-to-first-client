@@ -3,6 +3,15 @@
 import { useEffect, useId, useState } from "react";
 import { Clock, Loader2 } from "lucide-react";
 import { isPurchasable, pricing, type CurrencyCode } from "@/data/product";
+import type { Dictionary } from "@/i18n/dictionaries/en";
+import dynamic from "next/dynamic";
+import { loadCheckoutConfig, type CheckoutConfig } from "@/components/commerce/checkout-client";
+
+// Loaded only when checkout is enabled, so the landing page's JavaScript doesn't grow.
+const CheckoutDialog = dynamic(() => import("@/components/commerce/CheckoutDialog").then((m) => m.CheckoutDialog), { ssr: false });
+
+/** The `buy` strings plus the checkout dialog's strings, passed down from the page. */
+export type BuyStrings = Dictionary["buy"] & { checkout?: Dictionary["checkout"] };
 
 type Props = {
   label: string;
@@ -15,6 +24,8 @@ type Props = {
   size?: "md" | "lg";
   className?: string;
   noticeAlign?: "left" | "center";
+  /** Strings for the on-site Razorpay checkout. Used only when the server reports checkout as enabled. */
+  checkout?: Dictionary["checkout"];
 };
 
 const base =
@@ -31,12 +42,24 @@ const sizes = { md: "h-12 px-6 text-[0.95rem]", lg: "h-14 px-8 text-base" };
  * submission) and shows a loading state. Without one it explains that checkout isn't
  * open. It never simulates a purchase; payment is confirmed server-side by the provider.
  */
-export function BuyButton({ label, notice, redirecting: redirectingLabel, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left" }: Props) {
+export function BuyButton({ label, notice, redirecting: redirectingLabel, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left", checkout }: Props) {
   const preferred = pricing[currency];
   const target = isPurchasable(preferred) ? preferred : isPurchasable(pricing.INR) ? pricing.INR : isPurchasable(pricing.USD) ? pricing.USD : null;
   const [open, setOpen] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const noticeId = useId();
+  const [config, setConfig] = useState<CheckoutConfig | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Checkout availability is decided by the server at request time (no rebuild to switch it on or off).
+  useEffect(() => {
+    if (!checkout) return;
+    let live = true;
+    loadCheckoutConfig().then((c) => live && setConfig(c));
+    return () => {
+      live = false;
+    };
+  }, [checkout]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +75,17 @@ export function BuyButton({ label, notice, redirecting: redirectingLabel, curren
   }, []);
 
   const cls = `${base} ${variants[variant]} ${sizes[size]} ${className}`;
+
+  if (checkout && config?.enabled) {
+    return (
+      <>
+        <button type="button" className={cls} aria-haspopup="dialog" onClick={() => setDialogOpen(true)} data-checkout="razorpay">
+          {label}
+        </button>
+        {dialogOpen ? <CheckoutDialog t={checkout} config={config} open={dialogOpen} onClose={() => setDialogOpen(false)} /> : null}
+      </>
+    );
+  }
 
   if (target?.checkoutUrl) {
     const url = target.checkoutUrl;

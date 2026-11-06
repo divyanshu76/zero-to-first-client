@@ -6,11 +6,11 @@ import { deliveryLive, discountPercent, formatPrice, isPurchasable, pricing, pro
 import { deliverableFiles } from "@/data/resources";
 import type { Dictionary } from "@/i18n/dictionaries/en";
 import { fmt, localePath, type Locale } from "@/i18n/config";
-import { BuyButton } from "@/components/ui/BuyButton";
+import { BuyButton, type BuyStrings } from "@/components/ui/BuyButton";
 import { Reveal } from "@/components/ui/Reveal";
 import { BookShowcase } from "./BookShowcase";
 
-export function Pricing({ t, buy, book, locale }: { t: Dictionary["pricing"]; buy: Dictionary["buy"]; book: Dictionary["book"]; locale: Locale }) {
+export function Pricing({ t, buy, book, locale }: { t: Dictionary["pricing"]; buy: BuyStrings; book: Dictionary["book"]; locale: Locale }) {
   const available = (Object.keys(pricing) as CurrencyCode[]).filter((c) => pricing[c].amount !== null);
   const [currency, setCurrency] = useState<CurrencyCode>(available[0] ?? "INR");
   const p = pricing[currency];
@@ -71,7 +71,7 @@ export function Pricing({ t, buy, book, locale }: { t: Dictionary["pricing"]; bu
             </ul>
 
             <div className="mt-7">
-              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} currency={currency} className="w-full sm:w-auto" />
+              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} checkout={buy.checkout} currency={currency} className="w-full sm:w-auto" />
             </div>
 
             {/* One grid for both rows: icons share a column, texts share one left edge, icons align to the first line. */}

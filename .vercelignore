@@ -1,0 +1,9 @@
+# Never upload the paid product, local secrets or test fixtures with a CLI deploy.
+reference/
+.env*
+!.env.example
+tests/.fixtures/
+*.pdf
+*.docx
+*.xlsx
+*.zip

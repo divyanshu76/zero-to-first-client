@@ -14,14 +14,16 @@ export const privacy: PolicyContent = {
         <ul>
           <li><strong>No cookies, analytics or advertising trackers.</strong> The site doesn&apos;t set cookies or load third-party analytics. Fonts are served from this website, not from a third-party font service. Your language choice is stored only in your own browser (local storage) so the site can remember it.</li>
           <li><strong>Server logs.</strong> Like any website, the hosting provider (Vercel) automatically processes technical request data such as IP address, browser type, the page requested and the time. This is used to deliver the site, keep it secure and diagnose errors.</li>
-          <li><strong>No forms.</strong> The site has no newsletter, account or contact form that stores what you type.</li>
+          <li><strong>No marketing forms.</strong> The site has no newsletter, account or contact form. The only form is checkout (below), and the &ldquo;email me a new link&rdquo; form on the purchase page, which uses your email only to find your order.</li>
+          <li><strong>Purchase link in your browser.</strong> After a purchase, your private access link is kept in your browser&apos;s session storage for that tab, so the purchase page keeps working if you reload it. It is cleared when you close the tab.</li>
         </ul>
         <h2>3. What is collected when you buy</h2>
-        <p>When checkout is live, purchases are processed by a payment service provider (Razorpay, once integration is complete). To complete and deliver your order, the following may be collected:</p>
+        <p>Purchases are processed by Razorpay, a payment service provider. To complete and deliver your order, the following are collected:</p>
         <ul>
-          <li>your name, email address and phone number, as entered at checkout;</li>
+          <li>your name, email address and mobile number, as entered at checkout on this website (the mobile number is passed to Razorpay, which needs it to process the payment);</li>
           <li>the order and transaction references, amount, date and payment status;</li>
-          <li>delivery records, such as when a download link was sent and used.</li>
+          <li>delivery records, such as when the download email was sent and how many times the download was used;</li>
+          <li>the network (IP) address of requests, used briefly in memory to limit abuse such as repeated failed attempts.</li>
         </ul>
         <p>Your card, UPI or bank details are entered on the payment provider&apos;s secure page and are handled by the provider under its own privacy policy. They are not stored by this website.</p>
         <h2>4. Why it is used</h2>
@@ -33,11 +35,11 @@ export const privacy: PolicyContent = {
         </ul>
         <p>Your information is not sold. You won&apos;t receive marketing emails unless you separately choose to.</p>
         <h2>5. Who it is shared with</h2>
-        <p>Only with service providers that help run the business, such as the hosting provider, the payment provider and an email-delivery service. Each receives only what it needs. Information is also disclosed where the law requires it.</p>
+        <p>Only with service providers that help run the business: Vercel (website hosting), Razorpay (payments), Supabase (the order database and private file storage) and Resend (sending the download email). Each receives only what it needs. Information is also disclosed where the law requires it.</p>
         <h2>6. How long it is kept</h2>
         <p>Order and transaction records are kept for as long as tax, accounting and other legal obligations require. Support correspondence is kept for as long as needed to resolve the request. Server logs are kept according to the hosting provider&apos;s standard retention.</p>
         <h2>7. Security</h2>
-        <p>The site is served over HTTPS, and payment details are handled by the payment provider. When delivery opens, paid files will be released only through links issued after a verified payment, not through a public URL. No system is perfectly secure, but reasonable measures are taken to protect your information.</p>
+        <p>The site is served over HTTPS, and payment details are handled by the payment provider. Paid files are released only after the payment is verified on the server, through download links that expire after 15 minutes, never through a public URL. Access links are stored only in hashed form. No system is perfectly secure, but reasonable measures are taken to protect your information.</p>
         <h2>8. Your rights</h2>
         <p>Subject to applicable law, including India&apos;s Digital Personal Data Protection Act, 2023 as its provisions come into force, you can ask to access, correct or erase your personal information, withdraw consent where processing relies on it, and raise a grievance. Write to <SupportContact />.</p>
         <p>
@@ -63,14 +65,16 @@ export const privacy: PolicyContent = {
         <ul>
           <li><strong>कोई cookies, analytics या advertising trackers नहीं।</strong> Site cookies सेट नहीं करती और third-party analytics load नहीं करती। Fonts इसी website से आते हैं, किसी third-party font service से नहीं। आपकी चुनी हुई भाषा सिर्फ़ आपके अपने browser (local storage) में रखी जाती है, ताकि site उसे याद रख सके।</li>
           <li><strong>Server logs.</strong> हर website की तरह, hosting provider (Vercel) अपने-आप तकनीकी request data process करता है, जैसे IP address, browser का प्रकार, माँगा गया पेज और समय। इसका इस्तेमाल site चलाने, उसे सुरक्षित रखने और errors समझने के लिए होता है।</li>
-          <li><strong>कोई forms नहीं।</strong> Site पर कोई newsletter, account या contact form नहीं है जो आपकी लिखी बातें save करे।</li>
+          <li><strong>कोई marketing forms नहीं।</strong> Site पर कोई newsletter, account या contact form नहीं है। सिर्फ़ checkout form (नीचे देखें) और purchase page का &ldquo;नया link भेजें&rdquo; form है, जो आपके email का इस्तेमाल सिर्फ़ आपका order ढूँढने के लिए करता है।</li>
+          <li><strong>आपके browser में purchase link.</strong> ख़रीद के बाद आपका निजी access link उसी tab के लिए आपके browser के session storage में रखा जाता है, ताकि page reload करने पर भी purchase page काम करे। Tab बंद करने पर यह मिट जाता है।</li>
         </ul>
         <h2>3. ख़रीदारी के समय क्या लिया जाता है</h2>
-        <p>Checkout live होने पर ख़रीदारी एक payment service provider (integration पूरा होने पर Razorpay) से होगी। आपका order पूरा और deliver करने के लिए ये जानकारियाँ ली जा सकती हैं:</p>
+        <p>ख़रीदारी Razorpay नाम के payment service provider से होती है। आपका order पूरा और deliver करने के लिए ये जानकारियाँ ली जाती हैं:</p>
         <ul>
-          <li>आपका नाम, email address और phone number, जैसा आपने checkout में भरा;</li>
+          <li>आपका नाम, email address और mobile number, जैसा आपने इस website के checkout में भरा (mobile number Razorpay को भेजा जाता है, जिसे payment process करने के लिए इसकी ज़रूरत होती है);</li>
           <li>order और transaction references, रकम, तारीख़ और payment की स्थिति;</li>
-          <li>delivery records, जैसे download link कब भेजा और इस्तेमाल किया गया।</li>
+          <li>delivery records, जैसे download email कब भेजा गया और download कितनी बार इस्तेमाल हुआ;</li>
+          <li>requests का network (IP) address, जो बार-बार की ग़लत कोशिशों जैसे दुरुपयोग को रोकने के लिए थोड़े समय तक memory में इस्तेमाल होता है।</li>
         </ul>
         <p>आपके card, UPI या bank details payment provider के सुरक्षित पेज पर भरे जाते हैं और provider अपनी privacy policy के तहत उन्हें संभालता है। यह website उन्हें store नहीं करती।</p>
         <h2>4. इसका इस्तेमाल क्यों होता है</h2>
@@ -82,11 +86,11 @@ export const privacy: PolicyContent = {
         </ul>
         <p>आपकी जानकारी बेची नहीं जाती। जब तक आप अलग से न चुनें, आपको marketing emails नहीं भेजे जाएँगे।</p>
         <h2>5. जानकारी किसके साथ साझा होती है</h2>
-        <p>सिर्फ़ उन service providers के साथ जो business चलाने में मदद करते हैं, जैसे hosting provider, payment provider और email भेजने वाली service। हर एक को सिर्फ़ उतनी जानकारी मिलती है जितनी ज़रूरी है। जहाँ कानून माँगे, वहाँ भी जानकारी दी जाती है।</p>
+        <p>सिर्फ़ उन service providers के साथ जो business चलाने में मदद करते हैं, Vercel (website hosting), Razorpay (payments), Supabase (order database और private file storage) और Resend (download email भेजना)। हर एक को सिर्फ़ उतनी जानकारी मिलती है जितनी ज़रूरी है। जहाँ कानून माँगे, वहाँ भी जानकारी दी जाती है।</p>
         <h2>6. जानकारी कितने समय तक रखी जाती है</h2>
         <p>Order और transaction records उतने समय तक रखे जाते हैं जितना tax, accounting और दूसरे कानूनी दायित्वों के लिए ज़रूरी है। Support से हुई बातचीत तब तक रखी जाती है जब तक request सुलझ न जाए। Server logs hosting provider की सामान्य retention के अनुसार रखे जाते हैं।</p>
         <h2>7. सुरक्षा</h2>
-        <p>Site HTTPS पर चलती है, और payment details payment provider संभालता है। Delivery खुलने पर paid files सिर्फ़ verified payment के बाद जारी किए गए links से मिलेंगी, किसी public URL से नहीं। कोई भी system पूरी तरह सुरक्षित नहीं होता, पर आपकी जानकारी की सुरक्षा के लिए उचित कदम उठाए जाते हैं।</p>
+        <p>Site HTTPS पर चलती है, और payment details payment provider संभालता है। Paid files सिर्फ़ server पर payment verify होने के बाद मिलती हैं, ऐसे download links से जो 15 मिनट में expire हो जाते हैं, किसी public URL से कभी नहीं। Access links सिर्फ़ hashed रूप में रखे जाते हैं। कोई भी system पूरी तरह सुरक्षित नहीं होता, पर आपकी जानकारी की सुरक्षा के लिए उचित कदम उठाए जाते हैं।</p>
         <h2>8. आपके अधिकार</h2>
         <p>लागू कानून के अधीन, जिसमें भारत का Digital Personal Data Protection Act, 2023 (जैसे-जैसे उसके प्रावधान लागू होते हैं) शामिल है, आप अपनी personal जानकारी देखने, सुधारने या मिटाने को कह सकते हैं, जहाँ processing आपकी सहमति पर आधारित है वहाँ सहमति वापस ले सकते हैं, और शिकायत दर्ज कर सकते हैं। लिखें: <SupportContact />।</p>
         <p>
