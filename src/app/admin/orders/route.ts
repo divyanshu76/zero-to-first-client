@@ -58,13 +58,18 @@ const SLOW_DELAY = 2000;
 const MAX_QUEUE = 30;
 let queue: Promise<unknown> = Promise.resolve();
 let queued = 0;
-function serialised<T>(fn: () => T): Promise<T> {
+const inQueue = new Set<string>(); // one slot per IP, so a single client can't fill the queue
+function serialised<T>(ip: string, fn: () => T): Promise<T> {
   queued += 1;
+  inQueue.add(ip);
   const run = queue.then(async () => {
     await sleep(SLOW_DELAY);
     return fn();
   });
-  queue = run.catch(() => undefined).finally(() => (queued -= 1));
+  queue = run.catch(() => undefined).finally(() => {
+    queued -= 1;
+    inQueue.delete(ip);
+  });
   return run;
 }
 
@@ -85,8 +90,14 @@ async function gate(request: Request): Promise<Response | { user: string }> {
   }
   let a: ReturnType<typeof authorised>;
   if (attempt && isLimited("admin-fail:all", FAIL_GLOBAL).limited) {
-    if (queued >= MAX_QUEUE) return tooMany(60);
-    a = await serialised(() => authorised(request));
+    const ip = clientIp(request);
+    if (queued >= MAX_QUEUE || inQueue.has(ip)) {
+      // Turned away without checking the password: not a failed attempt, so give the reservation back.
+      refundHit(ipKey);
+      refundHit("admin-fail:all");
+      return tooMany(queued >= MAX_QUEUE ? 60 : 5);
+    }
+    a = await serialised(ip, () => authorised(request));
   } else {
     a = authorised(request);
   }
