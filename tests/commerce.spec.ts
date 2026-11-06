@@ -776,6 +776,13 @@ test.describe("checkout in the browser", () => {
     });
   }
 
+  test("with checkout on, the pricing note shows secure-payment text, not 'isn't open yet'", async ({ page }) => {
+    await page.goto(`${COMMERCE_URL}/#pricing`);
+    await expect(page.locator('#pricing [data-checkout="razorpay"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#pricing")).toContainText("Files are released only after the payment is verified");
+    await expect(page.locator("#pricing")).not.toContainText("Checkout isn't open yet");
+  });
+
   test("closing the payment window shows a cancelled message and charges nothing", async ({ page }) => {
     await page.addInitScript(() => ((window as unknown as { __rzpMode: string }).__rzpMode = "dismiss"));
     await page.goto(`${COMMERCE_URL}/#pricing`);
@@ -833,5 +840,6 @@ test("public site keeps checkout closed: no Razorpay script, config disabled", a
   await page.goto("/#pricing");
   await page.locator("#pricing button", { hasText: "Get instant access" }).click();
   await expect(page.locator("#pricing").getByText("Checkout isn't open yet. Secure payment will be available here at launch.")).toBeVisible();
+  await expect(page.locator("#pricing")).toContainText("Checkout isn't open yet. When it opens");
   expect(scripts.some((u) => u.includes("razorpay"))).toBe(false);
 });

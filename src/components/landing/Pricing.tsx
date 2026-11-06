@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown, ShieldCheck, Store } from "lucide-react";
 import { deliveryLive, discountPercent, formatPrice, isPurchasable, pricing, product, type CurrencyCode } from "@/data/product";
 import { deliverableFiles } from "@/data/resources";
 import type { Dictionary } from "@/i18n/dictionaries/en";
 import { fmt, localePath, type Locale } from "@/i18n/config";
 import { BuyButton, type BuyStrings } from "@/components/ui/BuyButton";
+import { loadCheckoutConfig } from "@/components/commerce/checkout-client";
 import { Reveal } from "@/components/ui/Reveal";
 import { BookShowcase } from "./BookShowcase";
 
@@ -15,7 +16,17 @@ export function Pricing({ t, buy, book, locale }: { t: Dictionary["pricing"]; bu
   const [currency, setCurrency] = useState<CurrencyCode>(available[0] ?? "INR");
   const p = pricing[currency];
   const off = discountPercent(p);
-  const live = isPurchasable(p);
+  // On-site checkout is switched on at runtime (/api/checkout/config), so the note follows the
+  // server's answer. Until it arrives, show the neutral line, which is true either way.
+  const [onSite, setOnSite] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadCheckoutConfig().then((c) => alive && setOnSite(c.enabled));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const live = isPurchasable(p) || onSite !== false;
   const href = (path: string) => localePath(locale, path);
 
   return (
