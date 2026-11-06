@@ -629,6 +629,18 @@ test.describe("admin", () => {
     await other.dispose();
   });
 
+  test("parallel guesses can't slip past the per-IP lockout", async () => {
+    const wrong = { authorization: `Basic ${Buffer.from(`${ADMIN.user}:parallel-guess`).toString("base64")}` };
+    const codes = await Promise.all(Array.from({ length: 15 }, () => api.get("/admin/orders", { headers: wrong }).then((r) => r.status())));
+    expect(codes.filter((c) => c === 401).length).toBeLessThanOrEqual(10);
+    expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(5);
+    expect((await api.get("/admin/orders", { headers: auth() })).status()).toBe(429);
+  });
+
+  test("a successful sign-in doesn't use up the attempt budget", async () => {
+    for (let i = 0; i < 12; i++) expect((await api.get("/admin/orders", { headers: auth() })).status()).toBe(200);
+  });
+
   test("logout answers 401 so the browser drops its credentials", async () => {
     const res = await api.get("/admin/logout");
     expect(res.status()).toBe(401);

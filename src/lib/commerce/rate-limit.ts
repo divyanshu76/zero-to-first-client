@@ -33,6 +33,12 @@ export function recordHit(key: string, windowMs: number) {
   rateLimit(key, Number.MAX_SAFE_INTEGER, windowMs);
 }
 
+/** Undoes one recordHit (e.g. an attempt that turned out to be a successful login). */
+export function refundHit(key: string) {
+  const b = buckets().get(key);
+  if (b && b.count > 0) b.count -= 1;
+}
+
 /**
  * The client's IP. On Vercel, x-vercel-forwarded-for / x-real-ip are set by the platform and can't be
  * forged by the client; the first x-forwarded-for entry is only a fallback for other hosts and local runs.

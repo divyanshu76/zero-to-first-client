@@ -3,7 +3,7 @@ import { PRODUCT, adminCredentials, checkoutStatus, emailDriver, ebookBucket, eb
 import { resendSenderStatus, sendIntegrationTestEmail } from "@/lib/commerce/email";
 import { ensureDelivered } from "@/lib/commerce/fulfil";
 import { NO_STORE, sameOrigin } from "@/lib/commerce/http";
-import { clientIp, isLimited, rateLimit, recordHit } from "@/lib/commerce/rate-limit";
+import { clientIp, isLimited, rateLimit, recordHit, refundHit } from "@/lib/commerce/rate-limit";
 import { ebookStorageStatus } from "@/lib/commerce/storage";
 import { getStore, type Order, type OrderStatus } from "@/lib/commerce/store";
 import { badge, esc, inr, ist, istDate, layout, ordersTable, stat, type View } from "@/lib/commerce/admin-ui";
@@ -39,35 +39,62 @@ const HEADERS = {
   "x-content-type-options": "nosniff",
 };
 
-// Brute-force protection (in memory, per server instance). Only failed attempts count.
+// Brute-force protection (in memory, per server instance; a shared store would need a schema change).
+// Only failed attempts count in the end; every attempt is reserved up front.
 // - Per IP: the lockout is checked BEFORE the password, so a locked-out IP is refused even with
-//   the right password.
-// - Globally: many failures across all IPs never lock the owner out; they only slow every attempt
-//   down, so distributed guessing gets expensive while a correct password still works.
+//   the right password, including requests sent in parallel.
+// - Globally: when failures across all IPs are high, checks are serialised (see below), which caps
+//   total guessing speed without permanently locking the owner out.
 const FAIL_PER_IP = 10;
 const FAIL_IP_WINDOW = 15 * 60_000;
 const FAIL_GLOBAL = 200;
 const FAIL_GLOBAL_WINDOW = 60 * 60_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// While global failures are high, credential checks run one at a time, 2 s apart: about 30 attempts
+// a minute across ALL clients, however many run in parallel. The owner still gets through (after a
+// wait) instead of being locked out; only a full queue is refused.
+const SLOW_DELAY = 2000;
+const MAX_QUEUE = 30;
+let queue: Promise<unknown> = Promise.resolve();
+let queued = 0;
+function serialised<T>(fn: () => T): Promise<T> {
+  queued += 1;
+  const run = queue.then(async () => {
+    await sleep(SLOW_DELAY);
+    return fn();
+  });
+  queue = run.catch(() => undefined).finally(() => (queued -= 1));
+  return run;
+}
 
 async function gate(request: Request): Promise<Response | { user: string }> {
   if (!adminCredentials()) return new Response("Not found", { status: 404, headers: NO_STORE });
   const ipKey = `admin-fail:${clientIp(request)}`;
+  const tooMany = (retryAfter: number) => new Response("Too many failed sign-in attempts. Try again later.", { status: 429, headers: { ...NO_STORE, "retry-after": String(retryAfter) } });
   const locked = isLimited(ipKey, FAIL_PER_IP);
-  if (locked.limited) {
-    return new Response("Too many failed sign-in attempts. Try again later.", { status: 429, headers: { ...NO_STORE, "retry-after": String(locked.retryAfter) } });
+  if (locked.limited) return tooMany(locked.retryAfter);
+
+  // A request with no credentials is the browser's normal first step, not a guess.
+  const attempt = !!request.headers.get("authorization");
+  if (attempt) {
+    // Reserve the attempt BEFORE any waiting, so parallel requests can't all slip past the
+    // per-IP check. A successful login gets its reservation back.
+    recordHit(ipKey, FAIL_IP_WINDOW);
+    recordHit("admin-fail:all", FAIL_GLOBAL_WINDOW);
   }
-  if (isLimited("admin-fail:all", FAIL_GLOBAL).limited) await sleep(2000);
-  const a = authorised(request);
+  let a: ReturnType<typeof authorised>;
+  if (attempt && isLimited("admin-fail:all", FAIL_GLOBAL).limited) {
+    if (queued >= MAX_QUEUE) return tooMany(60);
+    a = await serialised(() => authorised(request));
+  } else {
+    a = authorised(request);
+  }
   if (a === "disabled") return new Response("Not found", { status: 404, headers: NO_STORE });
-  if (!a) {
-    // A request with no credentials is the browser's normal first step, not a guess.
-    if (request.headers.get("authorization")) {
-      recordHit(ipKey, FAIL_IP_WINDOW);
-      recordHit("admin-fail:all", FAIL_GLOBAL_WINDOW);
-    }
-    return new Response("Authentication required", { status: 401, headers: { ...NO_STORE, "www-authenticate": 'Basic realm="CRAFT & CODE admin", charset="UTF-8"' } });
+  if (!a) return new Response("Authentication required", { status: 401, headers: { ...NO_STORE, "www-authenticate": 'Basic realm="CRAFT & CODE admin", charset="UTF-8"' } });
+  if (attempt) {
+    refundHit(ipKey);
+    refundHit("admin-fail:all");
   }
   return a;
 }
