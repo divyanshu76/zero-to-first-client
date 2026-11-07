@@ -57,6 +57,16 @@ so one network address may record reminder consent for at most 3 checkouts per h
 the order is created without consent), and the greeting uses the typed first name only if it is
 made of letters (any script); otherwise it says just "Hi,".
 
+Channels are independent (migration 005): email needs email consent and WhatsApp needs WhatsApp
+consent; neither stands in for the other. The admin panel shows each channel's status (eligible,
+Consent required, Unsubscribed, Stopped, Paid, Limit reached, Not yet, Unavailable) with the reason,
+and offers "Email + WhatsApp" only when both are eligible. Consent the customer gives later (e.g. they
+ask on WhatsApp to be contacted) can be recorded per channel with its source and evidence via
+`record_admin_consent()`: the database stamps the time (no backdating), refuses paid orders, and
+keeps an append-only `consent_records` row with the admin's name. Stop requests can be global
+(`email_suppressions`, all channels) or per channel (`channel_suppressions`); the email unsubscribe
+link always stops all channels, as the Privacy Policy promises.
+
 Stopping: an unsubscribe (link or one-click) or a "stop" request recorded by the admin in
 `/admin/recovery` ("Record a stop request") blocks **every** channel for that address: no reminder
 emails and no WhatsApp follow-up. Only a SHA-256 hash of the address is stored.

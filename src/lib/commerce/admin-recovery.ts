@@ -4,9 +4,9 @@ import { PRODUCT, adminCredentials, razorpayKeys, recoveryClockOverrideAllowed }
 import { safeEqualHex } from "./razorpay";
 import { badge, esc, inr, isTestOrder, ist, istDate, stat, testTag } from "./admin-ui";
 import { cleanEmail } from "./http";
-import { RULES, emailHash, logWhatsappOpened, recoveryDashboard, runRecovery, sendManualReminders, whatsappUrl, type RecoveryRow, type SendOutcome } from "./recovery";
+import { ADMIN_CONSENT, CONSENT_SOURCES, RULES, STOPPED_EVERYWHERE, emailHash, isUnpaid, logWhatsappOpened, recoveryDashboard, runRecovery, sendManualReminders, whatsappUrl, type ChannelVerdict, type RecoveryRow, type SendOutcome } from "./recovery";
 import { renderReminderEmail } from "./recovery-email";
-import { getStore, type Order, type RecoveryMessage, type RecoveryRun, type RecoverySettings } from "./store";
+import { getStore, type Channel, type ConsentSource, type Order, type RecoveryMessage, type RecoveryRun, type RecoverySettings } from "./store";
 
 /**
  * /admin/recovery — Checkout Recovery. Server-rendered, no JavaScript (the admin CSP forbids it):
@@ -68,7 +68,21 @@ const qs = (f: F, page: number) => {
 const includeTest = () => razorpayKeys().mode === "test";
 const contacted = (r: RecoveryRow) => r.messages.some((m) => m.status === "sent" || m.status === "opened");
 const reminderCell = (m: RecoveryMessage | null) => (m ? `${badge(m.status)}<br><span class="m nw">${ist(m.sentAt ?? m.createdAt)}</span>` : '<span class="m">—</span>');
-const recoveryStatus = (r: RecoveryRow) => `${badge(r.a.bucket)}<br><span class="m">${esc(r.a.reason)}</span>`;
+/** Channel status chip: "Email eligible", "Consent required", "Unsubscribed", "Stopped", "Paid", … plus the reason. */
+const CHANNEL_LABEL: Record<ChannelVerdict["state"], [string, string]> = {
+  eligible: ["eligible", "ok"],
+  consent_required: ["Consent required", "warn"],
+  unsubscribed: ["Unsubscribed", "muted"],
+  stopped: ["Stopped", "bad"],
+  paid: ["Paid", "ok"],
+  limit: ["Limit reached", "muted"],
+  not_due: ["Not yet", "warn"],
+  unavailable: ["Unavailable", "muted"],
+};
+const channelCell = (name: "Email" | "WhatsApp", v: ChannelVerdict, action: string) => {
+  const [label, tone] = CHANNEL_LABEL[v.state];
+  return `<span class="b ${tone}">${esc(v.state === "eligible" ? `${name} ${label}` : label)}</span><br><span class="m">${esc(v.reason)}</span>${action ? `<div style="margin-top:6px">${action}</div>` : ""}`;
+};
 
 function visible(rows: RecoveryRow[], f: F) {
   const q = f.q.toLowerCase();
@@ -104,13 +118,32 @@ ${form("run-now", confirm("Run one reminder pass now (same rules; does nothing w
 </div></section>`;
 }
 
-/** Opt-outs received by reply, WhatsApp "stop" or a support email: recorded here, effective for every channel. */
+/** Opt-outs received by reply, WhatsApp "stop" or a support email. "All channels" is the global stop list. */
 function stopCard() {
   return `<section class="card"><h2>Record a "stop" request</h2>
-<p class="sub">When a customer asks (by email reply, WhatsApp or support) to stop reminders, enter their email address. They get no more reminder emails and no WhatsApp follow-up. Only a one-way hash of the address is stored. Order and delivery emails for purchases are not affected.</p>
+<p class="sub">When a customer asks (by email reply, WhatsApp or support) to stop reminders, enter their email address and what they asked to stop. "All channels" blocks reminder emails and WhatsApp. Only a one-way hash of the address is stored. Order and delivery emails for purchases are not affected.</p>
 <form method="post" action="/admin/recovery" class="f"><input type="hidden" name="action" value="stop">
 <label class="l">Customer email<input type="email" name="email" required maxlength="254" autocomplete="off"></label>
-<label class="check"><input type="checkbox" name="confirm" value="yes" required> Stop all reminders to this address</label><button class="btn" type="submit">Stop reminders</button></form></section>`;
+<label class="l">Stop<select name="scope"><option value="all" selected>All channels</option><option value="email">Email reminders only</option><option value="whatsapp">WhatsApp only</option></select></label>
+<label class="check"><input type="checkbox" name="confirm" value="yes" required> The customer asked to stop</label><button class="btn" type="submit">Record stop</button></form></section>`;
+}
+
+/**
+ * Recording consent the admin obtained from the customer (e.g. "please WhatsApp me"). The form has
+ * no date field: the database stamps the current time, and the audit row can't be edited.
+ */
+export function consentPage(order: Order, channels: Channel[], user: string) {
+  if (!channels.length) return `<p class="note info">This checkout already has consent for both channels.</p><p><a class="btn" href="/admin/recovery">← Checkout Recovery</a></p>`;
+  return `<section class="card"><h2>Record consent for ${esc(order.customerName)}</h2>
+<dl class="kv"><dt>Order</dt><dd><code>${esc(order.id)}</code> · ${badge(order.status)} · started ${ist(order.createdAt)}</dd><dt>Email</dt><dd>${esc(order.customerEmail)}</dd><dt>Mobile</dt><dd>${esc(order.customerPhone ?? "—")}</dd></dl>
+<p class="note warn" style="margin-top:14px">Only record consent the customer actually gave you, in their own words, for this checkout. It is saved with today's date and time and your admin name (${esc(user)}); it can't be backdated, edited or deleted. Don't record consent you assume or would like to have.</p>
+<form method="post" action="/admin/recovery" class="f" style="margin-top:14px;align-items:stretch;flex-direction:column"><input type="hidden" name="action" value="record-consent"><input type="hidden" name="id" value="${esc(order.id)}">
+<label class="l">Channel<select name="channel">${channels.map((c) => `<option value="${c}">${c === "email" ? "Email reminders" : "WhatsApp"}</option>`).join("")}</select></label>
+<label class="l">How the customer gave consent<select name="source" required>${Object.entries(CONSENT_SOURCES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></label>
+<label class="l">Evidence (where it is and what they said, 5–300 characters)<input type="text" name="evidence" required minlength="5" maxlength="300" placeholder="e.g. WhatsApp message 7 Nov, 14:20: &quot;please send me the link here&quot;" style="width:100%"></label>
+<div class="note info">Wording recorded with the consent:<br>${channels.map((c) => `<strong>${c === "email" ? "Email" : "WhatsApp"}</strong> (${esc(ADMIN_CONSENT[c].version)}): ${esc(ADMIN_CONSENT[c].text)}`).join("<br>")}</div>
+<label class="check"><input type="checkbox" name="confirm" value="yes" required> The customer explicitly agreed to this, and the evidence above is accurate</label>
+<p class="f"><button class="btn p" type="submit">Record consent</button><a class="btn" href="/admin/recovery">Cancel</a></p></form></section>`;
 }
 
 function runLog(runs: RecoveryRun[]) {
@@ -143,14 +176,21 @@ function table(rows: RecoveryRow[], f: F, total: number, eligibleIds: string[]) 
 <label class="l">From<input type="date" name="from" value="${esc(f.from)}"></label><label class="l">To<input type="date" name="to" value="${esc(f.to)}"></label>
 <button class="btn p" type="submit">Apply</button><a class="btn" href="/admin/recovery">Reset</a></form></section>
 <form method="post" action="/admin/recovery"><input type="hidden" name="action" value="preview">
-<div class="tw">${shown.length ? `<table><thead><tr><th>Select</th><th>Customer</th><th>Mobile</th><th>Order</th><th class="r">Amount</th><th>Order date (IST)</th><th>Payment</th><th>1st reminder</th><th>2nd reminder</th><th>Last follow-up</th><th>Recovery status</th><th>Actions</th></tr></thead><tbody>${shown
+<div class="tw">${shown.length ? `<table><thead><tr><th>Select</th><th>Customer</th><th>Mobile</th><th>Order</th><th class="r">Amount</th><th>Order date (IST)</th><th>Payment</th><th>1st reminder</th><th>2nd reminder</th><th>Last follow-up</th><th>Email</th><th>WhatsApp</th><th>Other actions</th></tr></thead><tbody>${shown
     .map((r) => {
       const o = r.order;
+      const emailAction = r.a.manualEmail ? `<button class="btn" type="submit" name="one" value="${esc(o.id)}">Email</button>` : "";
+      const waAction = r.whatsappLink ? `<a class="btn" href="/admin/recovery?whatsapp=${esc(o.id)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : "";
+      // Combined action only when BOTH channels are eligible right now.
+      const both = r.a.manualEmail && r.whatsappLink ? `<button class="btn" type="submit" name="both" value="${esc(o.id)}">Email + WhatsApp</button> ` : "";
+      const canRecord = isUnpaid(o) && (r.a.email.state === "consent_required" || r.a.wa.state === "consent_required");
+      const record = canRecord ? `<a class="btn" href="/admin/recovery?consent=${esc(o.id)}">Record consent</a>` : "";
       return `<tr><td>${r.a.manualEmail ? `<input type="checkbox" name="ids" value="${esc(o.id)}" aria-label="Select ${esc(o.customerName)}">` : ""}</td>
 <td>${esc(o.customerName)}<br><span class="m">${esc(o.customerEmail)}</span></td><td class="nw">${esc(o.customerPhone ?? "—")}</td>
 <td><a href="/admin/orders?view=orders&amp;id=${esc(o.id)}"><code>${esc(o.id)}</code></a>${testTag(o)}</td><td class="r nw">${inr(o.amount)}</td><td class="nw">${ist(o.createdAt)}</td><td>${badge(o.status)}</td>
-<td>${reminderCell(r.a.first)}</td><td>${reminderCell(r.a.second)}</td><td class="nw">${ist(r.a.lastFollowUp)}</td><td>${recoveryStatus(r)}</td>
-<td class="nw">${r.a.manualEmail ? `<button class="btn" type="submit" name="one" value="${esc(o.id)}">Email</button> ` : ""}${r.whatsappLink ? `<a class="btn" href="/admin/recovery?whatsapp=${esc(o.id)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ""}</td></tr>`;
+<td>${reminderCell(r.a.first)}</td><td>${reminderCell(r.a.second)}</td><td class="nw">${ist(r.a.lastFollowUp)}</td>
+<td data-channel="email">${channelCell("Email", r.a.email, emailAction)}</td><td data-channel="whatsapp">${channelCell("WhatsApp", r.a.wa, waAction)}</td>
+<td class="nw">${both}${record}${!both && !record ? '<span class="m">—</span>' : ""}</td></tr>`;
     })
     .join("")}</tbody></table>` : `<div class="empty">No checkouts match.</div>`}</div>
 <p class="pg"><span>${total} checkout(s) · page ${page} of ${pages}</span><span>${page > 1 ? `<a class="btn" href="${qs(f, page - 1)}">← Previous</a> ` : ""}${page < pages ? `<a class="btn" href="${qs(f, page + 1)}">Next →</a>` : ""}</span></p>
@@ -174,7 +214,7 @@ export async function recoveryView(u: URL, orders: Order[], now = Date.now()) {
   const list = visible(rows, f);
   const eligibleIds = eligible.filter((r) => r.a.manualEmail).map((r) => r.order.id);
   return `
-<p class="note info">Reminders go only to customers who ticked the optional reminder box at checkout. Older checkouts (before consent was collected) are never contacted. WhatsApp is manual: the button opens a pre-filled chat, and you review and press Send yourself.</p>
+<p class="note info">Email and WhatsApp need separate consent: from the checkout boxes, or recorded here after the customer agreed (with evidence; it can't be backdated). Older checkouts without consent are never contacted. WhatsApp is manual: the button opens a pre-filled chat, and you review and press Send yourself.</p>
 <section class="grid" aria-label="Recovery numbers">
 ${stat("Pending checkouts", String(pending.length), "unpaid, not counting Test Mode")}
 ${stat("Eligible customers", String(eligibleEmails.size), "opted in and can be followed up")}
@@ -194,7 +234,7 @@ ${runLog(runs)}`;
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
 
-function previewPage(orders: Order[], skipped: number, now: number) {
+function previewPage(orders: Order[], skipped: number, now: number, withWhatsapp = false) {
   const sample = orders[0];
   const { subject, text } = renderReminderEmail({ to: sample.customerEmail, name: sample.customerName, locale: sample.locale, orderId: sample.id, continueUrl: "[secure Continue checkout link, created when sent]", unsubscribeUrl: "[unsubscribe link, created when sent]", oneClickUrl: "", sequence: 1 });
   const batch = orders.slice(0, RULES.BULK_BATCH);
@@ -205,16 +245,17 @@ ${skipped ? `<p class="note warn">${skipped} selected checkout(s) aren't eligibl
 <div class="tw"><table><thead><tr><th>Customer</th><th>Order</th><th>Language</th></tr></thead><tbody>${batch.map((o) => `<tr><td>${esc(o.customerName)}<br><span class="m">${esc(o.customerEmail)}</span></td><td><code>${esc(o.id)}</code></td><td>${o.locale === "hi" ? "Hindi" : "English"}</td></tr>`).join("")}</tbody></table></div>
 <h2 style="margin-top:18px">Email preview (${sample.locale === "hi" ? "Hindi" : "English"}, for ${esc(sample.customerName)})</h2>
 <p><strong>Subject:</strong> ${esc(subject)}</p><pre style="white-space:pre-wrap;background:#faf9f6;border:1px solid var(--line);border-radius:12px;padding:14px;font:13px/1.5 ui-monospace,monospace">${esc(text)}</pre>
-<form method="post" action="/admin/recovery" class="f" style="margin-top:14px"><input type="hidden" name="action" value="send">${batch.map((o) => `<input type="hidden" name="ids" value="${esc(o.id)}">`).join("")}${previewFields(batch.map((o) => o.id), now)}
+${withWhatsapp ? `<p class="note info">Email + WhatsApp: after the email is sent, the results page shows a WhatsApp button for this customer. WhatsApp is never sent automatically: it opens a pre-filled chat for you to review and send.</p>` : ""}
+<form method="post" action="/admin/recovery" class="f" style="margin-top:14px"><input type="hidden" name="action" value="send">${withWhatsapp ? '<input type="hidden" name="with_wa" value="1">' : ""}${batch.map((o) => `<input type="hidden" name="ids" value="${esc(o.id)}">`).join("")}${previewFields(batch.map((o) => o.id), now)}
 <label class="check"><input type="checkbox" name="confirm" value="yes" required> Send this reminder to ${batch.length} customer(s)</label><button class="btn p" type="submit">Send ${batch.length} email(s)</button><a class="btn" href="/admin/recovery">Cancel</a></form></section>`;
 }
 
-function resultsPage(results: SendOutcome[], now: number) {
+function resultsPage(results: SendOutcome[], now: number, whatsappFor: Set<string> = new Set()) {
   const failed = results.filter((r) => r.result === "failed");
   const count = (k: SendOutcome["result"]) => results.filter((r) => r.result === k).length;
   return `<section class="card"><h2>Send results</h2><p class="sub">${count("sent")} sent · ${count("failed")} failed · ${count("skipped")} skipped · ${count("paid")} found already paid</p>
-<div class="tw"><table><thead><tr><th>Order</th><th>Email</th><th>Result</th><th>Detail</th></tr></thead><tbody>${results
-    .map((r) => `<tr><td><code>${esc(r.orderId)}</code></td><td>${esc(r.email)}</td><td>${badge(r.result === "paid" ? "paid" : r.result)}</td><td class="m">${esc(r.reason)}</td></tr>`)
+<div class="tw"><table><thead><tr><th>Order</th><th>Email</th><th>Result</th><th>Detail</th><th>WhatsApp</th></tr></thead><tbody>${results
+    .map((r) => `<tr><td><code>${esc(r.orderId)}</code></td><td>${esc(r.email)}</td><td>${badge(r.result === "paid" ? "paid" : r.result)}</td><td class="m">${esc(r.reason)}</td><td>${whatsappFor.has(r.orderId) ? `<a class="btn" href="/admin/recovery?whatsapp=${esc(r.orderId)}" target="_blank" rel="noopener noreferrer">Open WhatsApp</a>` : '<span class="m">—</span>'}</td></tr>`)
     .join("")}</tbody></table></div>
 ${failed.length ? `<form method="post" action="/admin/recovery" class="f" style="margin-top:14px"><input type="hidden" name="action" value="send">${failed.map((r) => `<input type="hidden" name="ids" value="${esc(r.orderId)}">`).join("")}${previewFields(failed.map((r) => r.orderId), now)}<label class="check"><input type="checkbox" name="confirm" value="yes" required> Retry the ${failed.length} failed email(s)</label><button class="btn p" type="submit">Retry failed</button></form>` : ""}
 <p style="margin-top:14px"><a class="btn" href="/admin/recovery">← Checkout Recovery</a></p></section>`;
@@ -224,7 +265,7 @@ ${failed.length ? `<form method="post" action="/admin/recovery" class="f" style=
  * Handles a POST to /admin/recovery (already signed in and same-origin checked by the caller).
  * Returns either a notice for the normal page or a full body (preview / results).
  */
-export async function recoveryAction(form: FormData, orders: Order[], now = Date.now(), budgetMs?: number): Promise<{ notice: Notice } | { body: string; title: string; notice?: Notice }> {
+export async function recoveryAction(form: FormData, orders: Order[], now = Date.now(), budgetMs?: number, user = "admin"): Promise<{ notice: Notice } | { body: string; title: string; notice?: Notice }> {
   const store = getStore();
   const action = String(form.get("action") ?? "");
   const confirmed = form.get("confirm") === "yes";
@@ -232,14 +273,22 @@ export async function recoveryAction(form: FormData, orders: Order[], now = Date
   if (action === "preview") {
     let ids = form.getAll("ids").map(String);
     const one = form.get("one");
+    const both = form.get("both");
     const { rows } = await recoveryDashboard(orders, now);
-    const allowed = new Map(rows.filter((r) => r.a.manualEmail && (includeTest() || !isTestOrder(r.order))).map((r) => [r.order.id, r.order]));
+    const usable = rows.filter((r) => r.a.manualEmail && (includeTest() || !isTestOrder(r.order)));
+    const allowed = new Map(usable.map((r) => [r.order.id, r.order]));
+    if (both) {
+      // Email + WhatsApp: only when both channels are eligible for this checkout.
+      const row = usable.find((r) => r.order.id === String(both));
+      if (!row || !row.a.whatsapp) return { notice: { tone: "warn", text: "Email + WhatsApp needs both channels to be eligible for this checkout (see its Email and WhatsApp status)." } };
+      return { title: "Confirm reminder email", body: previewPage([row.order], 0, now, true) };
+    }
     if (one) ids = [String(one)];
     else if (form.get("all") === "1") ids = [...allowed.keys()];
     ids = [...new Set(ids)];
     if (!ids.length) return { notice: { tone: "warn", text: "Select at least one customer first." } };
     const chosen = ids.map((id) => allowed.get(id)).filter((o): o is Order => !!o);
-    if (!chosen.length) return { notice: { tone: "warn", text: "None of the selected checkouts can be emailed right now (see their recovery status)." } };
+    if (!chosen.length) return { notice: { tone: "warn", text: "None of the selected checkouts can be emailed right now (see their Email status)." } };
     return { title: "Confirm reminder emails", body: previewPage(chosen, ids.length - chosen.length, now) };
   }
 
@@ -259,7 +308,15 @@ export async function recoveryAction(form: FormData, orders: Order[], now = Date
     }
     try {
       const results = await sendManualReminders(ids, now, budgetMs);
-      return { title: "Send results", body: resultsPage(results, now) };
+      // Email + WhatsApp: offer the WhatsApp button only if the email went out AND WhatsApp is still
+      // eligible now (re-checked; the button's own route checks again when clicked).
+      let whatsappFor = new Set<string>();
+      if (form.get("with_wa") === "1") {
+        const sentIds = new Set(results.filter((r) => r.result === "sent").map((r) => r.orderId));
+        const { rows } = await recoveryDashboard(await store.listOrders(1000), now);
+        whatsappFor = new Set(rows.filter((r) => sentIds.has(r.order.id) && r.a.whatsapp).map((r) => r.order.id));
+      }
+      return { title: "Send results", body: resultsPage(results, now, whatsappFor) };
     } finally {
       await store.releaseRecoveryLock("run").catch(() => {});
       await store.releaseRecoveryLock("bulk").catch(() => {});
@@ -268,8 +325,30 @@ export async function recoveryAction(form: FormData, orders: Order[], now = Date
   if (action === "stop") {
     const email = cleanEmail(form.get("email"));
     if (!email) return { notice: { tone: "bad", text: "Enter a valid email address." } };
+    const scope = String(form.get("scope") ?? "all");
+    if (scope === "email" || scope === "whatsapp") {
+      await store.addChannelSuppression(emailHash(email), scope, "admin");
+      return { notice: { tone: "ok", text: scope === "email" ? "Done: no more reminder emails to that address (WhatsApp follows its own consent and stops)." : "Done: no more WhatsApp follow-ups to that address (email follows its own consent and stops)." } };
+    }
     await store.addSuppression(emailHash(email), "admin");
     return { notice: { tone: "ok", text: "Done: no more reminder emails or WhatsApp follow-ups to that address." } };
+  }
+  if (action === "record-consent") {
+    const id = String(form.get("id") ?? "");
+    const channel = String(form.get("channel") ?? "") as Channel;
+    const source = String(form.get("source") ?? "") as ConsentSource;
+    const evidence = String(form.get("evidence") ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+    const order = /^ord_[a-f0-9]{24}$/.test(id) ? await store.getOrder(id) : null;
+    if (!order) return { notice: { tone: "bad", text: "Unknown order." } };
+    if (channel !== "email" && channel !== "whatsapp") return { notice: { tone: "bad", text: "Choose a channel." } };
+    if (!Object.hasOwn(CONSENT_SOURCES, source)) return { notice: { tone: "bad", text: "Choose how the customer gave consent." } };
+    if (evidence.length < 5 || evidence.length > 300) return { notice: { tone: "bad", text: "Describe the evidence in 5–300 characters (where it is and what the customer said)." } };
+    if (!isUnpaid(order)) return { notice: { tone: "bad", text: `Not recorded: this order is ${order.status}; checkout recovery doesn't apply.` } };
+    if ((channel === "email" ? order.emailConsentAt : order.whatsappConsentAt) !== null) return { notice: { tone: "warn", text: "Not recorded: this checkout already has consent for that channel." } };
+    const at = await store.recordAdminConsent({ orderId: order.id, channel, source, evidence, consentVersion: ADMIN_CONSENT[channel].version, recordedBy: user });
+    const stops = await store.getStops(emailHash(order.customerEmail)).catch(() => STOPPED_EVERYWHERE);
+    const stillStopped = stops.all || (channel === "email" ? stops.email : stops.whatsapp);
+    return { notice: { tone: stillStopped ? "warn" : "ok", text: `Consent for ${channel === "email" ? "email" : "WhatsApp"} recorded at ${ist(at)} by ${user}.${stillStopped ? " Note: this address has a stop request for that channel, which stays in force." : ""}` } };
   }
   if (action === "automation-on" || action === "automation-off") {
     await store.updateRecoverySettings({ automationEnabled: action === "automation-on" });
@@ -313,7 +392,8 @@ export async function recoveryWhatsapp(request: Request, id: string, orders: Ord
   const url = row?.a.whatsapp ? whatsappUrl(row.order.customerPhone) : null;
   if (!row || !url) return notFound("WhatsApp isn't available for this checkout (no WhatsApp consent, already followed up, paid, or not eligible).");
   // Re-check the stop list right before opening the chat (fail closed if it can't be read).
-  if (await getStore().isSuppressed(emailHash(row.order.customerEmail)).catch(() => true)) return notFound("This customer asked not to be contacted.");
+  const stops = await getStore().getStops(emailHash(row.order.customerEmail)).catch(() => STOPPED_EVERYWHERE);
+  if (stops.all || stops.whatsapp) return notFound("This customer asked not to be contacted on WhatsApp.");
   await logWhatsappOpened(row.order).catch((e) => console.error(`[recovery] whatsapp log failed: ${(e as Error).message}`));
   return new Response(null, { status: 303, headers: { location: url, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }

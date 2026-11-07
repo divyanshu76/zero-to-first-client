@@ -4,7 +4,7 @@ import { appOrigin, razorpayKeys, recoveryCronSecret } from "./config";
 import { ensureDelivered } from "./fulfil";
 import { fetchRazorpayOrderPayments, paymentMatchesOrder } from "./razorpay";
 import { sendReminderEmail } from "./recovery-email";
-import { getStore, type Order, type OrderStatus, type RecoveryMessage, type RecoveryStage, type RunResult } from "./store";
+import { getStore, type Order, type OrderStatus, type RecoveryMessage, type RecoveryStage, type RunResult, type Stops } from "./store";
 
 /**
  * Checkout recovery: opt-in reminder emails (automatic at 30 min / 24 h, or sent by the admin) and
@@ -18,6 +18,17 @@ import { getStore, type Order, type OrderStatus, type RecoveryMessage, type Reco
 
 /** Version of the opt-in wording shown at checkout (stored with each consent). */
 export const CONSENT_VERSION = "2026-11-07.v1";
+
+/**
+ * Consent the admin records after a genuine customer interaction (e.g. the customer wrote on
+ * WhatsApp asking to be contacted). The wording is fixed per channel and version; the database
+ * stamps the time (no backdating) and keeps an append-only audit row with the source and evidence.
+ */
+export const ADMIN_CONSENT = {
+  email: { version: "admin-email-2026-11-08.v1", text: "The customer asked or clearly agreed to receive email from CRAFT & CODE about this checkout." },
+  whatsapp: { version: "admin-whatsapp-2026-11-08.v1", text: "The customer asked or clearly agreed to be contacted on WhatsApp by CRAFT & CODE about this checkout." },
+} as const;
+export const CONSENT_SOURCES = { email_reply: "Customer's email reply", whatsapp_message: "Customer's WhatsApp message", phone_call: "Phone call with the customer", in_person: "In person", other: "Other (describe in the evidence)" } as const;
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -70,9 +81,21 @@ export function whatsappUrl(phone: string | null) {
 
 /* ── Eligibility ───────────────────────────────────────────────────────── */
 
+/**
+ * One channel's verdict. Every state except "eligible" says why the action is unavailable:
+ * consent_required (the customer never agreed to this channel), unsubscribed (used the link),
+ * stopped (a stop request was recorded), paid (bought / paying), limit (caps or already done),
+ * not_due (too early), unavailable (anything else, e.g. no valid mobile number).
+ */
+export type ChannelState = "eligible" | "consent_required" | "unsubscribed" | "stopped" | "paid" | "limit" | "not_due" | "unavailable";
+export type ChannelVerdict = { state: ChannelState; reason: string };
+
 export type Assessment = {
   bucket: "eligible" | "waiting" | "purchased" | "paid" | "ineligible";
   reason: string;
+  /** Per-channel verdicts. Email consent never stands in for WhatsApp consent, or the reverse. */
+  email: ChannelVerdict;
+  wa: ChannelVerdict;
   /** Automatic reminder due now (retryId set when retrying a failed attempt of that stage). */
   due: { stage: "auto_1" | "auto_2"; retryId: string | null } | null;
   manualEmail: boolean;
@@ -88,9 +111,13 @@ export type AssessContext = {
   emailOrders: Order[];
   /** Recovery messages for those orders. */
   messages: RecoveryMessage[];
-  suppressed: boolean;
+  /** Stop requests for this address: global (`all`) and per channel. */
+  stops: Stops;
   includeTest?: boolean;
 };
+
+/** Treat an unreadable stop list as "stopped everywhere" (fail closed). */
+export const STOPPED_EVERYWHERE: Stops = { all: true, allReason: "admin", email: true, whatsapp: true };
 
 export function assess(order: Order, ctx: AssessContext): Assessment {
   const age = ctx.now - Date.parse(order.createdAt);
@@ -99,53 +126,82 @@ export function assess(order: Order, ctx: AssessContext): Assessment {
   const second = own.find((m) => m.stage === "auto_2") ?? null;
   const lastFollowUp = ctx.messages.filter((m) => m.status !== "failed").map((m) => m.sentAt ?? m.createdAt).sort().at(-1) ?? null;
   const base = { due: null, manualEmail: false, whatsapp: false, first, second, lastFollowUp };
-  const stop = (bucket: Assessment["bucket"], reason: string): Assessment => ({ ...base, bucket, reason });
+  // Order-level blocks apply to both channels.
+  const both = (bucket: Assessment["bucket"], state: ChannelState, reason: string): Assessment => ({ ...base, bucket, reason, email: { state, reason }, wa: { state, reason } });
 
-  if (order.status === "paid") return stop("paid", "paid");
-  if (!isUnpaid(order)) return stop(order.status === "processing" ? "waiting" : "ineligible", order.status === "processing" ? "payment in progress" : order.status);
-  if (isTest(order) && !(ctx.includeTest ?? includeTestOrders())) return stop("ineligible", "Test Mode order");
-  if (ctx.emailOrders.some((o) => o.status === "paid" || o.status === "refunded")) return stop("purchased", "this email already has a paid order");
-  if (ctx.emailOrders.some((o) => o.status === "processing")) return stop("waiting", "a payment for this email is in progress");
-  if (ctx.emailOrders.some((o) => o.id !== order.id && o.createdAt > order.createdAt)) return stop("ineligible", "a newer checkout exists for this email");
-  if (!order.emailConsentAt && !order.whatsappConsentAt) return stop("ineligible", "no reminder consent");
+  if (order.status === "paid") return both("paid", "paid", "paid");
+  if (order.status === "refunded") return both("ineligible", "paid", "refunded");
+  if (order.status === "processing") return both("waiting", "paid", "payment in progress");
+  if (!isUnpaid(order)) return both("ineligible", "unavailable", order.status);
+  if (isTest(order) && !(ctx.includeTest ?? includeTestOrders())) return both("ineligible", "unavailable", "Test Mode order");
+  if (ctx.emailOrders.some((o) => o.status === "paid" || o.status === "refunded")) return both("purchased", "paid", "this email already has a paid order");
+  if (ctx.emailOrders.some((o) => o.status === "processing")) return both("waiting", "paid", "a payment for this email is in progress");
+  if (ctx.emailOrders.some((o) => o.id !== order.id && o.createdAt > order.createdAt)) return both("ineligible", "unavailable", "a newer checkout exists for this email");
 
-  // One WhatsApp follow-up per address (as the Privacy Policy promises). The link stays usable for
-  // 24 hours after the admin first opens it (e.g. WhatsApp didn't load), then disappears.
-  const firstWa = ctx.messages.filter((m) => m.channel === "whatsapp").map((m) => Date.parse(m.createdAt)).sort((x, y) => x - y)[0];
-  const whatsappUsed = firstWa !== undefined && ctx.now - firstWa > DAY;
-  // An unsubscribed (or admin-stopped) address gets no follow-up on any channel.
-  const whatsapp = !!order.whatsappConsentAt && !ctx.suppressed && !whatsappUsed && !!whatsappUrl(order.customerPhone) && age >= RULES.MANUAL_FROM && age <= RULES.MANUAL_UNTIL;
+  const globalStop = (): ChannelVerdict | null =>
+    ctx.stops.all ? (ctx.stops.allReason === "unsubscribe" ? { state: "unsubscribed", reason: "customer unsubscribed (all checkout reminders)" } : { state: "stopped", reason: "stop request recorded (all channels)" }) : null;
+
+  /* ── Email ── */
+  let email: ChannelVerdict;
   let due: Assessment["due"] = null;
   let manualEmail = false;
-  let reason: string;
-  if (!order.emailConsentAt) reason = "no email consent";
-  else if (ctx.suppressed) reason = "unsubscribed";
+  if (!order.emailConsentAt) email = { state: "consent_required", reason: "customer didn't opt in to email reminders" };
+  else if (globalStop()) email = globalStop()!;
+  else if (ctx.stops.email) email = { state: "stopped", reason: "email stop request recorded" };
   else {
     const counted = ctx.messages.filter((m) => m.channel === "email" && (m.status === "sent" || m.status === "sending"));
     const inWindow = counted.filter((m) => Date.parse(m.createdAt) > ctx.now - RULES.CAP_WINDOW).length;
     const lastEmail = Math.max(0, ...counted.map((m) => Date.parse(m.sentAt ?? m.createdAt)));
     const forThisCheckout = counted.filter((m) => m.orderId === order.id).length;
-    if (forThisCheckout >= RULES.CAP_PER_CHECKOUT) reason = "2 reminders already sent for this checkout";
-    else if (inWindow >= RULES.CAP_PER_ADDRESS) reason = "reminder limit reached (3 in 30 days)";
-    else if (ctx.now - lastEmail < RULES.GAP) reason = "reminded less than 12 hours ago";
+    if (forThisCheckout >= RULES.CAP_PER_CHECKOUT) email = { state: "limit", reason: "2 reminders already sent for this checkout" };
+    else if (inWindow >= RULES.CAP_PER_ADDRESS) email = { state: "limit", reason: "reminder limit reached (3 in 30 days)" };
+    else if (ctx.now - lastEmail < RULES.GAP) email = { state: "limit", reason: "reminded less than 12 hours ago" };
     else {
       manualEmail = age >= RULES.MANUAL_FROM && age <= RULES.MANUAL_UNTIL;
       const slot = (stage: "auto_1" | "auto_2", msg: RecoveryMessage | null) =>
         !msg ? { stage, retryId: null } : msg.status === "failed" && msg.attempts < RULES.MAX_AUTO_ATTEMPTS ? { stage, retryId: msg.id } : null;
       if (age >= RULES.SECOND_AT && age < RULES.AUTO_UNTIL) due = slot("auto_2", second);
       else if (age >= RULES.FIRST_AT && age < RULES.FIRST_UNTIL) due = slot("auto_1", first);
-      reason = due ? `${due.stage === "auto_1" ? "1st" : "2nd"} reminder due` : age < RULES.FIRST_AT ? "1st reminder not due yet" : age >= RULES.AUTO_UNTIL ? "automatic reminders finished (72 h)" : "next reminder not due yet";
+      if (due) email = { state: "eligible", reason: `${due.stage === "auto_1" ? "1st" : "2nd"} reminder due` };
+      else if (manualEmail) email = { state: "eligible", reason: age < RULES.FIRST_AT ? "manual email allowed (1st automatic reminder at 30 min)" : "manual email allowed" };
+      else if (age < RULES.MANUAL_FROM) email = { state: "not_due", reason: "checkout started less than 15 minutes ago" };
+      else email = { state: "unavailable", reason: "checkout older than 7 days" };
     }
   }
-  if (due || manualEmail || whatsapp) return { ...base, bucket: "eligible", reason: due || manualEmail ? reason : "WhatsApp follow-up only", due, manualEmail, whatsapp };
-  return { ...base, bucket: age < RULES.FIRST_AT ? "waiting" : "ineligible", reason };
+
+  /* ── WhatsApp (manual only) ── */
+  // One WhatsApp follow-up per address (as the Privacy Policy promises). The link stays usable for
+  // 24 hours after the admin first opens it (e.g. WhatsApp didn't load), then disappears.
+  const firstWa = ctx.messages.filter((m) => m.channel === "whatsapp").map((m) => Date.parse(m.createdAt)).sort((x, y) => x - y)[0];
+  let wa: ChannelVerdict;
+  if (!order.whatsappConsentAt) wa = { state: "consent_required", reason: "customer didn't opt in to WhatsApp" };
+  else if (globalStop()) wa = globalStop()!;
+  else if (ctx.stops.whatsapp) wa = { state: "stopped", reason: "WhatsApp stop request recorded" };
+  else if (!whatsappUrl(order.customerPhone)) wa = { state: "unavailable", reason: "no valid Indian mobile number" };
+  else if (firstWa !== undefined && ctx.now - firstWa > DAY) wa = { state: "limit", reason: "already followed up on WhatsApp" };
+  else if (age < RULES.MANUAL_FROM) wa = { state: "not_due", reason: "checkout started less than 15 minutes ago" };
+  else if (age > RULES.MANUAL_UNTIL) wa = { state: "unavailable", reason: "checkout older than 7 days" };
+  else wa = { state: "eligible", reason: "manual WhatsApp allowed" };
+  const whatsapp = wa.state === "eligible";
+
+  const any = email.state === "eligible" || whatsapp;
+  const waiting = email.state === "not_due" || wa.state === "not_due";
+  const bucket: Assessment["bucket"] = any ? "eligible" : waiting ? "waiting" : "ineligible";
+  const reason =
+    email.state === wa.state && email.state === "consent_required" ? "no reminder consent (email or WhatsApp)" : `email: ${email.reason}; WhatsApp: ${wa.reason}`;
+  return { ...base, bucket, reason, email, wa, due, manualEmail, whatsapp };
+}
+
+async function stopsFor(email: string): Promise<Stops> {
+  return getStore().getStops(emailHash(email));
 }
 
 async function contextFor(order: Order, now: number): Promise<AssessContext> {
   const store = getStore();
   const emailOrders = await store.ordersByEmail(order.customerEmail);
-  const [messages, suppressed] = await Promise.all([store.messagesForOrders(emailOrders.map((o) => o.id)), store.isSuppressed(emailHash(order.customerEmail))]);
-  return { now, emailOrders, messages, suppressed };
+  // getStops throws if it can't be read: the caller then sends nothing (fail closed).
+  const [messages, stops] = await Promise.all([store.messagesForOrders(emailOrders.map((o) => o.id)), stopsFor(order.customerEmail)]);
+  return { now, emailOrders, messages, stops };
 }
 
 /* ── Payment re-check (Razorpay is the source of truth) ────────────────── */
@@ -443,15 +499,15 @@ export async function recoveryDashboard(orders: Order[], now = Date.now()) {
   // Reminders are only ever sent within 7 days of a checkout, so 60 days of history covers every row shown.
   const messages = await store.listRecoveryMessages(new Date(now - 60 * DAY).toISOString(), 2000);
   const msgsFor = (ids: Set<string>) => messages.filter((m) => ids.has(m.orderId));
-  const suppressed = new Map<string, boolean>();
+  const stopsByEmail = new Map<string, Stops>();
   const rows: RecoveryRow[] = [];
   for (const o of orders) {
     if (!isUnpaid(o) && o.status !== "processing") continue;
     const emailOrders = byEmail.get(o.customerEmail) ?? [o];
     // Every address is checked, whatever it consented to (a stop blocks WhatsApp too), and a failed
     // lookup counts as "stopped": the dashboard never offers a follow-up it couldn't verify.
-    if (!suppressed.has(o.customerEmail)) suppressed.set(o.customerEmail, await store.isSuppressed(emailHash(o.customerEmail)).catch(() => true));
-    const ctx: AssessContext = { now, emailOrders, messages: msgsFor(new Set(emailOrders.map((x) => x.id))), suppressed: suppressed.get(o.customerEmail) ?? true };
+    if (!stopsByEmail.has(o.customerEmail)) stopsByEmail.set(o.customerEmail, await stopsFor(o.customerEmail).catch(() => STOPPED_EVERYWHERE));
+    const ctx: AssessContext = { now, emailOrders, messages: msgsFor(new Set(emailOrders.map((x) => x.id))), stops: stopsByEmail.get(o.customerEmail) ?? STOPPED_EVERYWHERE };
     const a = assess(o, ctx);
     rows.push({ order: o, a, whatsappLink: a.whatsapp ? whatsappUrl(o.customerPhone) : null, messages: ctx.messages.filter((m) => m.orderId === o.id) });
   }

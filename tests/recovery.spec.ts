@@ -399,7 +399,7 @@ test("16. checkout dialog: opt-in boxes start unticked; a resume link opens it p
 test("17. the Privacy Policy describes the opt-in reminders (English and Hindi)", async () => {
   const en = await (await api.get("/privacy")).text();
   expect(en).toContain("only if you opted in at checkout");
-  expect(en).toContain("7 November 2026");
+  expect(en).toContain("8 November 2026");
   const hi = await (await api.get("/hi/privacy")).text();
   expect(hi).toContain("सिर्फ़ तब, जब आपने checkout पर चुना हो");
 });
@@ -433,7 +433,7 @@ test("19. [M1/M2] a stop request recorded by the admin blocks reminder emails an
   expect(await (await adminPost({ action: "stop", email: `  ${o.email.toUpperCase()} `, confirm: "yes" })).text()).toContain("no more reminder emails or WhatsApp");
   const after = await dashboard();
   expect(after).not.toContain(`?whatsapp=${o.orderId}`);
-  expect(after).toContain("unsubscribed");
+  expect(after).toContain("stop request recorded (all channels)"); // shown as Stopped (admin), not Unsubscribed (link)
   expect((await api.get(`/admin/recovery?whatsapp=${o.orderId}`, { headers: { ...auth(), "sec-fetch-site": "same-origin", "x-recovery-test-now": String(at) }, maxRedirects: 0 })).status()).toBe(404);
   expect(await (await adminPost({ action: "preview", one: o.orderId }, at)).text()).toContain("None of the selected checkouts can be emailed");
   await run(o.t0 + 31 * MIN);
@@ -565,4 +565,152 @@ test("27. [review] one network address can record reminder consent for at most 3
   await run(made[3].t0 + 31 * MIN);
   for (const m of made.slice(0, 3)) expect(await reminders(m.email)).toHaveLength(1);
   expect(await reminders(made[3].email)).toHaveLength(0); // 4th opt-in from the same address wasn't recorded
+});
+
+/* ── Channel eligibility (email and WhatsApp are independent) ──────────── */
+
+/** The dashboard row for one order, and its Email / WhatsApp cells. */
+async function channelRow(o: Created, at: number) {
+  const html = await (await api.get(`/admin/recovery?show=all&q=${encodeURIComponent(o.email)}`, { headers: { ...auth(), "x-recovery-test-now": String(at) } })).text();
+  const row = html.split("<tr>").find((r) => r.includes(`id=${o.orderId}"`)) ?? "";
+  const cell = (ch: string) => new RegExp(`data-channel="${ch}">([\\s\\S]*?)</td>`).exec(row)?.[1] ?? "";
+  return { row, email: cell("email"), wa: cell("whatsapp") };
+}
+
+test("28. each channel shows its own status: consent on one channel never enables the other", async () => {
+  const emailOnly = await order("ch-email", { email: true });
+  const waOnly = await order("ch-wa", { whatsapp: true });
+  const both = await order("ch-both", { email: true, whatsapp: true });
+  const none = await order("ch-none", {}); // like an order placed before the opt-in boxes existed
+  const at = none.t0 + 20 * MIN;
+
+  const e = await channelRow(emailOnly, at);
+  expect(e.email).toContain("Email eligible");
+  expect(e.wa).toContain("Consent required");
+  expect(e.wa).toContain("customer didn&#39;t opt in to WhatsApp");
+  expect(e.row).not.toContain("?whatsapp=");
+  expect(e.row).not.toContain(">Email + WhatsApp<");
+  expect(e.row).toContain(`?consent=${emailOnly.orderId}`);
+
+  const w = await channelRow(waOnly, at);
+  expect(w.email).toContain("Consent required");
+  expect(w.email).toContain("customer didn&#39;t opt in to email reminders");
+  expect(w.wa).toContain("WhatsApp eligible");
+  expect(w.wa).toContain(`?whatsapp=${waOnly.orderId}`);
+  expect(w.email).not.toContain('name="one"');
+
+  const b = await channelRow(both, at);
+  expect(b.email).toContain("Email eligible");
+  expect(b.wa).toContain("WhatsApp eligible");
+  expect(b.row).toContain(`name="both" value="${both.orderId}"`);
+  expect(b.row).not.toContain("?consent=");
+
+  const n = await channelRow(none, at);
+  expect(n.email).toContain("Consent required");
+  expect(n.wa).toContain("Consent required");
+  expect(n.row).not.toContain('name="one"');
+  expect(n.row).not.toContain("?whatsapp=");
+  expect(n.row).toContain(`?consent=${none.orderId}`); // shown, not silently hidden
+  expect((await api.get(`/admin/recovery?whatsapp=${none.orderId}`, { headers: { ...auth(), "sec-fetch-site": "same-origin", "x-recovery-test-now": String(at) }, maxRedirects: 0 })).status()).toBe(404);
+  await run(none.t0 + 31 * MIN);
+  expect(await reminders(none.email)).toHaveLength(0);
+  expect(await reminders(waOnly.email)).toHaveLength(0); // WhatsApp consent never enables email
+  expect(await reminders(emailOnly.email)).toHaveLength(1);
+});
+
+test("29. stop requests per channel: an email stop leaves WhatsApp, a WhatsApp stop leaves email", async () => {
+  const a = await order("stop-email", { email: true, whatsapp: true });
+  const b = await order("stop-wa", { email: true, whatsapp: true });
+  const at = b.t0 + 20 * MIN;
+  expect(await (await adminPost({ action: "stop", email: a.email, scope: "email", confirm: "yes" })).text()).toContain("no more reminder emails to that address");
+  expect(await (await adminPost({ action: "stop", email: b.email, scope: "whatsapp", confirm: "yes" })).text()).toContain("no more WhatsApp follow-ups to that address");
+  const ra = await channelRow(a, at);
+  expect(ra.email).toContain("Stopped");
+  expect(ra.email).toContain("email stop request recorded");
+  expect(ra.wa).toContain("WhatsApp eligible");
+  const rb = await channelRow(b, at);
+  expect(rb.wa).toContain("Stopped");
+  expect(rb.wa).toContain("WhatsApp stop request recorded");
+  expect(rb.email).toContain("Email eligible");
+  const open = (o: Created) => api.get(`/admin/recovery?whatsapp=${o.orderId}`, { headers: { ...auth(), "sec-fetch-site": "same-origin", "x-recovery-test-now": String(at) }, maxRedirects: 0 });
+  expect((await open(a)).status()).toBe(303);
+  expect((await open(b)).status()).toBe(404);
+  await run(b.t0 + 31 * MIN);
+  expect(await reminders(a.email)).toHaveLength(0);
+  expect(await reminders(b.email)).toHaveLength(1);
+});
+
+test("30. the unsubscribe link marks both channels Unsubscribed; a global admin stop marks both Stopped", async () => {
+  const u = await order("unsub-both", { email: true, whatsapp: true });
+  await run(u.t0 + 31 * MIN);
+  const [m] = await reminders(u.email);
+  expect((await api.post(oneClickUrl(m), { form: { "List-Unsubscribe": "One-Click" } })).status()).toBe(200);
+  const ru = await channelRow(u, u.t0 + 40 * MIN);
+  expect(ru.email).toContain("Unsubscribed");
+  expect(ru.wa).toContain("Unsubscribed");
+  const g = await order("global-stop", { email: true, whatsapp: true });
+  await adminPost({ action: "stop", email: g.email, scope: "all", confirm: "yes" });
+  const rg = await channelRow(g, g.t0 + 20 * MIN);
+  expect(rg.email).toContain("Stopped");
+  expect(rg.wa).toContain("Stopped");
+});
+
+test("31. recording consent: per channel, with source and evidence, server time only, never for paid orders", async () => {
+  const o = await order("record", {});
+  const page = await (await api.get(`/admin/recovery?consent=${o.orderId}`, { headers: auth() })).text();
+  expect(page).toContain("Record consent for Asha Verma");
+  expect(page).toContain("admin-whatsapp-2026-11-08.v1");
+  expect(page).not.toMatch(/type="(date|datetime-local|time)"/); // no way to choose a date
+  const record = (f: Record<string, string>) => adminPost({ action: "record-consent", id: o.orderId, channel: "whatsapp", source: "whatsapp_message", evidence: "WhatsApp 8 Nov: please send me the link here", ...f });
+  expect(await (await record({})).text()).toContain("tick the confirmation box");
+  expect(await (await record({ confirm: "yes", evidence: "hi" })).text()).toContain("5–300 characters");
+  expect(await (await record({ confirm: "yes", source: "guess" })).text()).toContain("Choose how the customer gave consent");
+  const ok = await (await record({ confirm: "yes", recorded_at: "2020-01-01T00:00:00Z" })).text(); // an extra date field is ignored
+  expect(ok).toContain("Consent for WhatsApp recorded at");
+  expect(ok).toContain("by admin");
+  expect(await (await record({ confirm: "yes" })).text()).toContain("already has consent for that channel");
+  const r = await channelRow(o, o.t0 + 20 * MIN);
+  expect(r.wa).toContain("WhatsApp eligible");
+  expect(r.email).toContain("Consent required"); // WhatsApp consent doesn't enable email
+  await run(o.t0 + 31 * MIN);
+  expect(await reminders(o.email)).toHaveLength(0);
+
+  const paid = await order("record-paid", {});
+  await payAndVerify(paid);
+  expect(await (await api.get(`/admin/recovery?consent=${paid.orderId}`, { headers: auth() })).text()).toContain("checkout recovery doesn&#39;t apply");
+  expect(await (await adminPost({ action: "record-consent", id: paid.orderId, channel: "email", source: "email_reply", evidence: "Customer replied by email", confirm: "yes" })).text()).toContain("Not recorded: this order is paid");
+});
+
+test("32. Email + WhatsApp only when both channels are eligible; WhatsApp stays a manual button", async () => {
+  const both = await order("combo", { email: true, whatsapp: true });
+  const emailOnly = await order("combo-email", { email: true });
+  const at = emailOnly.t0 + 20 * MIN;
+  expect(await (await adminPost({ action: "preview", both: emailOnly.orderId }, at)).text()).toContain("needs both channels to be eligible");
+  const preview = await (await adminPost({ action: "preview", both: both.orderId }, at)).text();
+  expect(preview).toContain("after the email is sent, the results page shows a WhatsApp button");
+  const { fields } = previewForm(preview);
+  expect(fields.map(([k]) => k)).toContain("with_wa");
+  const results = await (await postForm([["action", "send"], ["confirm", "yes"], ...fields], at)).text();
+  expect(results).toContain("1 sent");
+  expect(results).toContain(`/admin/recovery?whatsapp=${both.orderId}`);
+  expect(await reminders(both.email)).toHaveLength(1);
+});
+
+test("33. paid customers show Paid on both channels; stops are re-checked right before sending", async () => {
+  const early = await order("paid-later", { email: true, whatsapp: true });
+  const later = await order("paid-later", { email: false }, { email: early.email });
+  await payAndVerify(later);
+  const r = await channelRow(early, early.t0 + 20 * MIN);
+  expect(r.email).toContain("Paid");
+  expect(r.wa).toContain("Paid");
+  expect(r.row).not.toContain("?whatsapp=");
+
+  const o = await order("recheck", { email: true, whatsapp: true });
+  const at = o.t0 + 20 * MIN;
+  const { fields } = previewForm(await (await adminPost({ action: "preview", one: o.orderId }, at)).text());
+  await adminPost({ action: "stop", email: o.email, scope: "email", confirm: "yes" }); // after the preview, before sending
+  const res = await (await postForm([["action", "send"], ["confirm", "yes"], ...fields], at)).text();
+  expect(res).toContain("0 sent");
+  expect(res).toContain("email stop request recorded");
+  expect(await reminders(o.email)).toHaveLength(0);
 });

@@ -8,7 +8,7 @@ import { clientIp, isLimited, rateLimit, recordHit, refundHit } from "@/lib/comm
 import { ebookStorageStatus } from "@/lib/commerce/storage";
 import { getStore, type Order, type OrderStatus } from "@/lib/commerce/store";
 import { badge, esc, inr, isTestOrder, ist, istDate, layout, ordersTable, stat, testTag, type View } from "@/lib/commerce/admin-ui";
-import { recoveryAction, recoveryNow, recoveryTestBudget, recoveryView, recoveryWhatsapp } from "@/lib/commerce/admin-recovery";
+import { consentPage, recoveryAction, recoveryNow, recoveryTestBudget, recoveryView, recoveryWhatsapp } from "@/lib/commerce/admin-recovery";
 
 /**
  * Admin dashboard: /admin/orders (HTTP Basic auth with ADMIN_USER / ADMIN_PASSWORD).
@@ -329,6 +329,14 @@ export async function adminGet(request: Request, forcedView?: View) {
   if (g instanceof Response) return g;
   const wa = forcedView === "recovery" ? new URL(request.url).searchParams.get("whatsapp") : null;
   if (wa !== null) return recoveryWhatsapp(request, wa, await getStore().listOrders(MAX_ROWS), recoveryNow(request));
+  const consentFor = forcedView === "recovery" ? new URL(request.url).searchParams.get("consent") : null;
+  if (consentFor !== null) {
+    const order = /^ord_[a-f0-9]{24}$/.test(consentFor) ? await getStore().getOrder(consentFor) : null;
+    if (!order) return render(request, g.user, { tone: "bad", text: "Unknown order." }, forcedView);
+    if (!["pending", "cancelled", "failed"].includes(order.status)) return render(request, g.user, { tone: "bad", text: `This order is ${order.status}; checkout recovery doesn't apply.` }, forcedView);
+    const missing = ([["email", order.emailConsentAt], ["whatsapp", order.whatsappConsentAt]] as const).filter(([, at]) => !at).map(([c]) => c);
+    return render(request, g.user, null, forcedView, { title: "Record customer consent", body: consentPage(order, [...missing], g.user) });
+  }
   return render(request, g.user, null, forcedView);
 }
 
@@ -350,7 +358,7 @@ export async function adminPost(request: Request, forcedView?: View) {
   if (forcedView === "recovery") {
     if (!form) return render(request, g.user, { tone: "bad", text: "The form could not be read." }, forcedView);
     try {
-      const r = await recoveryAction(form, await getStore().listOrders(MAX_ROWS), recoveryNow(request), recoveryTestBudget(request));
+      const r = await recoveryAction(form, await getStore().listOrders(MAX_ROWS), recoveryNow(request), recoveryTestBudget(request), g.user);
       return "body" in r ? render(request, g.user, r.notice ?? null, forcedView, r) : render(request, g.user, r.notice, forcedView);
     } catch (e) {
       console.error(`[admin] recovery action failed: ${(e as Error).message}`);

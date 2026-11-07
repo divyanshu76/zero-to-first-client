@@ -60,6 +60,11 @@ export type RunResult = Pick<RecoveryRun, "status" | "examined" | "sent" | "skip
 export type Consent = { emailAt: string | null; whatsappAt: string | null; version: string; recoveredFromOrderId: string | null };
 type ClaimInput = Pick<RecoveryMessage, "orderId" | "channel" | "stage" | "idempotencyKey" | "triggeredBy"> & { status?: "sending" | "opened" };
 type TokenPurpose = "resume" | "unsubscribe";
+export type Channel = "email" | "whatsapp";
+/** Stop requests for one address: `all` is the global list (blocks every channel). */
+export type Stops = { all: boolean; allReason: "unsubscribe" | "admin" | null; email: boolean; whatsapp: boolean };
+export type ConsentSource = "email_reply" | "whatsapp_message" | "phone_call" | "in_person" | "other";
+export type ConsentRecord = { orderId: string; channel: Channel; source: ConsentSource; evidence: string; consentVersion: string; recordedBy: string; recordedAt: string };
 
 export type NewOrder = Pick<Order, "id" | "productId" | "customerName" | "customerEmail" | "customerPhone" | "locale" | "amount" | "currency" | "razorpayOrderId">;
 
@@ -119,6 +124,12 @@ export interface OrderStore {
   listRecoveryRuns(limit: number): Promise<RecoveryRun[]>;
   isSuppressed(emailHash: string): Promise<boolean>;
   addSuppression(emailHash: string, reason: "unsubscribe" | "admin"): Promise<void>;
+  /** Global and per-channel stops for one address (migration 005). Throws if unreadable: callers fail closed. */
+  getStops(emailHash: string): Promise<Stops>;
+  addChannelSuppression(emailHash: string, channel: Channel, reason: "unsubscribe" | "admin"): Promise<void>;
+  /** Records consent the admin obtained from the customer. Server time only (no backdating); refused for paid orders. */
+  recordAdminConsent(r: Omit<ConsentRecord, "recordedAt">): Promise<string>;
+  listConsentRecords(orderIds: string[]): Promise<ConsentRecord[]>;
   addRecoveryToken(tokenHash: string, orderId: string, purpose: TokenPurpose, expiresAt: string): Promise<void>;
   findRecoveryToken(tokenHash: string): Promise<{ orderId: string; purpose: TokenPurpose; expiresAt: string } | null>;
 }
@@ -128,7 +139,7 @@ const now = () => new Date().toISOString();
 /* ── In-memory store: development and automated tests only ─────────────── */
 
 type Mem = { orders: Map<string, Order>; byRzp: Map<string, string>; payments: Set<string>; events: Map<string, { type: string; at: string }>; tokens: Map<string, { orderId: string; expiresAt: string }> };
-type RecoveryMem = { messages: RecoveryMessage[]; seq: number; settings: RecoverySettings; locks: Record<"run" | "bulk", number>; runs: RecoveryRun[]; nonces: Set<string>; suppressed: Set<string>; tokens: Map<string, { orderId: string; purpose: TokenPurpose; expiresAt: string }> };
+type RecoveryMem = { messages: RecoveryMessage[]; seq: number; settings: RecoverySettings; locks: Record<"run" | "bulk", number>; runs: RecoveryRun[]; nonces: Set<string>; suppressed: Set<string>; tokens: Map<string, { orderId: string; purpose: TokenPurpose; expiresAt: string }>; channelStops?: Set<string>; consents?: ConsentRecord[]; stopReasons?: Map<string, "unsubscribe" | "admin"> };
 const g = globalThis as unknown as { __ztfcMem?: Mem; __ztfcRecovery?: RecoveryMem };
 
 class MemoryStore implements OrderStore {
@@ -274,7 +285,28 @@ class MemoryStore implements OrderStore {
   }
   async listRecoveryRuns(limit: number) { return [...this.r.runs].reverse().slice(0, limit).map((x) => ({ ...x })); }
   async isSuppressed(h: string) { return this.r.suppressed.has(h); }
-  async addSuppression(h: string) { this.r.suppressed.add(h); }
+  async addSuppression(h: string, reason: "unsubscribe" | "admin" = "unsubscribe") {
+    this.r.suppressed.add(h);
+    if (!(this.r.stopReasons ??= new Map()).has(h)) this.r.stopReasons.set(h, reason);
+  }
+  async getStops(h: string) {
+    const c = (this.r.channelStops ??= new Set());
+    const all = this.r.suppressed.has(h);
+    return { all, allReason: all ? (this.r.stopReasons?.get(h) ?? "unsubscribe") : null, email: c.has(`${h}:email`), whatsapp: c.has(`${h}:whatsapp`) };
+  }
+  async addChannelSuppression(h: string, channel: Channel) { (this.r.channelStops ??= new Set()).add(`${h}:${channel}`); }
+  async recordAdminConsent(r: Omit<ConsentRecord, "recordedAt">) {
+    const o = this.m.orders.get(r.orderId);
+    if (!o) throw new Error("order not found");
+    if (o.status === "paid" || o.status === "refunded") throw new Error(`order is ${o.status}`);
+    if (r.evidence.trim().length < 5) throw new Error("evidence is required");
+    const at = now();
+    (this.r.consents ??= []).push({ ...r, evidence: r.evidence.trim(), recordedAt: at });
+    if (r.channel === "email") o.emailConsentAt ??= at;
+    else o.whatsappConsentAt ??= at;
+    return at;
+  }
+  async listConsentRecords(ids: string[]) { const set = new Set(ids); return (this.r.consents ?? []).filter((c) => set.has(c.orderId)).map((c) => ({ ...c })); }
   async addRecoveryToken(h: string, orderId: string, purpose: TokenPurpose, expiresAt: string) {
     if (this.r.tokens.has(h)) throw Object.assign(new Error("conflict"), { conflict: true });
     this.r.tokens.set(h, { orderId, purpose, expiresAt });
@@ -484,6 +516,26 @@ class SupabaseStore implements OrderStore {
   }
   async listRecoveryRuns(limit: number) { return (await this.req<Row[]>(`/recovery_runs?order=started_at.desc&limit=${limit}`)).map(toRun); }
   async isSuppressed(h: string) { return (await this.req<Row[]>(`/email_suppressions?email_hash=eq.${enc(h)}&select=email_hash&limit=1`)).length > 0; }
+  async getStops(h: string) {
+    const [g, ch] = await Promise.all([this.req<Row[]>(`/email_suppressions?email_hash=eq.${enc(h)}&select=reason&limit=1`), this.req<Row[]>(`/channel_suppressions?email_hash=eq.${enc(h)}&select=channel`)]);
+    return { all: g.length > 0, allReason: (g[0]?.reason as "unsubscribe" | "admin" | undefined) ?? null, email: ch.some((r) => r.channel === "email"), whatsapp: ch.some((r) => r.channel === "whatsapp") };
+  }
+  async addChannelSuppression(h: string, channel: Channel, reason: "unsubscribe" | "admin") {
+    try {
+      await this.req(`/channel_suppressions`, { method: "POST", prefer: "return=minimal", body: JSON.stringify({ email_hash: h, channel, reason }) });
+    } catch (e) {
+      if (!(e as { conflict?: boolean }).conflict) throw e; // already stopped
+    }
+  }
+  async recordAdminConsent(r: Omit<ConsentRecord, "recordedAt">) {
+    const at = await this.rpc<string>("record_admin_consent", { p_order_id: r.orderId, p_channel: r.channel, p_source: r.source, p_evidence: r.evidence, p_version: r.consentVersion, p_by: r.recordedBy });
+    return String(at);
+  }
+  async listConsentRecords(ids: string[]) {
+    if (!ids.length) return [];
+    const rows = await this.req<Row[]>(`/consent_records?order_id=in.${enc(inList(ids))}&order=recorded_at.asc&limit=500`);
+    return rows.map((r) => ({ orderId: r.order_id as string, channel: r.channel as Channel, source: r.source as ConsentSource, evidence: r.evidence as string, consentVersion: r.consent_version as string, recordedBy: r.recorded_by as string, recordedAt: r.recorded_at as string }));
+  }
   async addSuppression(h: string, reason: "unsubscribe" | "admin") {
     try {
       await this.req(`/email_suppressions`, { method: "POST", prefer: "return=minimal", body: JSON.stringify({ email_hash: h, reason }) });

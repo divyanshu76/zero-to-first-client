@@ -5,7 +5,7 @@ export const privacy: PolicyContent = {
   en: {
     title: "Privacy Policy",
     description: "What information the ZERO TO FIRST CLIENT website and checkout collect, why, who processes it and how to exercise your rights.",
-    updated: "7 November 2026",
+    updated: "8 November 2026",
     summary: () => "This website collects very little. It sets no cookies and runs no analytics or advertising trackers. When checkout opens, the personal information needed to process and deliver your order is collected through the payment provider. This page explains what is collected, why, and your choices.",
     body: ({ Pending, SellerIdentity, SupportContact }) => (
       <>
@@ -24,7 +24,7 @@ export const privacy: PolicyContent = {
           <li>your name, email address and mobile number, as entered at checkout on this website (the mobile number is passed to Razorpay, which needs it to process the payment);</li>
           <li>the order and transaction references, amount, date and payment status;</li>
           <li>delivery records, such as when the download email was sent and how many times the download was used;</li>
-          <li>if you tick them, your choices to receive checkout reminders by email and/or a WhatsApp message, with the time you chose and the version of the wording you saw;</li>
+          <li>if you tick them, your choices to receive checkout reminders by email and/or a WhatsApp message, with the time you chose and the version of the wording you saw; if you instead ask us directly (for example by replying or messaging us), a record of when, how and for which channel you agreed;</li>
           <li>a record of checkout reminders sent to you (when, and whether sending succeeded) and, if you unsubscribe, a one-way hash of your email address, so you are not reminded again;</li>
           <li>the network (IP) address of requests, used briefly in memory to limit abuse such as repeated failed attempts.</li>
         </ul>
@@ -35,7 +35,7 @@ export const privacy: PolicyContent = {
           <li>to answer support requests and resolve delivery or payment problems;</li>
           <li>to prevent fraud and misuse, such as unauthorised redistribution;</li>
           <li>to keep the records that tax and accounting law requires;</li>
-          <li><strong>only if you opted in at checkout:</strong> to email you up to 2 reminders about a checkout you didn&apos;t finish (about 30 minutes and 24 hours after you started it; never more than 3 reminder emails in 30 days), and for CRAFT &amp; CODE to message you once on WhatsApp about it, written and sent by a person, never automatically. Reminders contain no offers or discounts.</li>
+          <li><strong>only if you opted in at checkout:</strong> to email you up to 2 reminders about a checkout you didn&apos;t finish (about 30 minutes and 24 hours after you started it; never more than 3 reminder emails in 30 days), and for CRAFT &amp; CODE to message you once on WhatsApp about it, written and sent by a person, never automatically. Email and WhatsApp need separate consent. Reminders contain no offers or discounts.</li>
         </ul>
         <p>Your information is not sold. You won&apos;t receive marketing emails unless you separately choose to. The reminder choices at checkout are optional and don&apos;t affect your purchase. Reminders stop as soon as you buy, unsubscribe (every reminder email has a link), or ask us to stop.</p>
         <h2>5. Who it is shared with</h2>
@@ -61,7 +61,7 @@ export const privacy: PolicyContent = {
   hi: {
     title: "Privacy Policy",
     description: "ZERO TO FIRST CLIENT की website और checkout कौन सी जानकारी लेते हैं, क्यों, उसे कौन process करता है और आप अपने अधिकार कैसे इस्तेमाल करें।",
-    updated: "7 नवंबर 2026",
+    updated: "8 नवंबर 2026",
     summary: () => "यह website बहुत कम जानकारी लेती है। यह कोई cookie सेट नहीं करती और कोई analytics या advertising tracker नहीं चलाती। Checkout खुलने पर, आपका order process और deliver करने के लिए ज़रूरी personal जानकारी payment provider के ज़रिए ली जाएगी। यह पेज बताता है कि क्या लिया जाता है, क्यों, और आपके पास क्या विकल्प हैं।",
     body: ({ Pending, SellerIdentity, SupportContact }) => (
       <>
@@ -80,7 +80,7 @@ export const privacy: PolicyContent = {
           <li>आपका नाम, email address और mobile number, जैसा आपने इस website के checkout में भरा (mobile number Razorpay को भेजा जाता है, जिसे payment process करने के लिए इसकी ज़रूरत होती है);</li>
           <li>order और transaction references, रकम, तारीख़ और payment की स्थिति;</li>
           <li>delivery records, जैसे download email कब भेजा गया और download कितनी बार इस्तेमाल हुआ;</li>
-          <li>अगर आप tick करें, तो email और/या WhatsApp पर checkout reminders पाने के आपके विकल्प, आपने कब चुना और आपको दिखी wording का version;</li>
+          <li>अगर आप tick करें, तो email और/या WhatsApp पर checkout reminders पाने के आपके विकल्प, आपने कब चुना और आपको दिखी wording का version; अगर आप हमसे सीधे कहें (जैसे जवाब या message करके), तो आपने कब, कैसे और किस channel के लिए सहमति दी, उसका record;</li>
           <li>आपको भेजे गए checkout reminders का record (कब, और भेजना सफल रहा या नहीं) और, अगर आप unsubscribe करें, तो आपके email address का one-way hash, ताकि आपको दोबारा reminder न भेजा जाए;</li>
           <li>requests का network (IP) address, जो बार-बार की ग़लत कोशिशों जैसे दुरुपयोग को रोकने के लिए थोड़े समय तक memory में इस्तेमाल होता है।</li>
         </ul>
@@ -91,7 +91,7 @@ export const privacy: PolicyContent = {
           <li>support requests का जवाब देने और delivery या payment की समस्याएँ सुलझाने के लिए;</li>
           <li>धोखाधड़ी और ग़लत इस्तेमाल, जैसे बिना अनुमति files बाँटना, रोकने के लिए;</li>
           <li>tax और accounting कानून के अनुसार ज़रूरी records रखने के लिए;</li>
-          <li><strong>सिर्फ़ तब, जब आपने checkout पर चुना हो:</strong> अधूरे checkout के बारे में आपको ज़्यादा से ज़्यादा 2 reminder emails भेजने के लिए (checkout शुरू करने के लगभग 30 मिनट और 24 घंटे बाद; 30 दिनों में 3 से ज़्यादा reminder emails कभी नहीं), और CRAFT &amp; CODE की ओर से इसके बारे में आपको एक बार WhatsApp message करने के लिए, जो कोई व्यक्ति ख़ुद लिखकर भेजता है, कभी अपने-आप नहीं। Reminders में कोई offer या discount नहीं होता।</li>
+          <li><strong>सिर्फ़ तब, जब आपने checkout पर चुना हो:</strong> अधूरे checkout के बारे में आपको ज़्यादा से ज़्यादा 2 reminder emails भेजने के लिए (checkout शुरू करने के लगभग 30 मिनट और 24 घंटे बाद; 30 दिनों में 3 से ज़्यादा reminder emails कभी नहीं), और CRAFT &amp; CODE की ओर से इसके बारे में आपको एक बार WhatsApp message करने के लिए, जो कोई व्यक्ति ख़ुद लिखकर भेजता है, कभी अपने-आप नहीं। Email और WhatsApp के लिए अलग-अलग सहमति चाहिए। Reminders में कोई offer या discount नहीं होता।</li>
         </ul>
         <p>आपकी जानकारी बेची नहीं जाती। जब तक आप अलग से न चुनें, आपको marketing emails नहीं भेजे जाएँगे। Checkout पर reminders के विकल्प वैकल्पिक हैं और आपकी ख़रीद पर कोई असर नहीं डालते। जैसे ही आप ख़रीदते हैं, unsubscribe करते हैं (हर reminder email में link होता है), या हमें रुकने को कहते हैं, reminders बंद हो जाते हैं।</p>
         <h2>5. जानकारी किसके साथ साझा होती है</h2>

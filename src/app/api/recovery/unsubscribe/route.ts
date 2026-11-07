@@ -19,18 +19,18 @@ import { unsubscribeByToken } from "@/lib/commerce/recovery";
 const copy = {
   en: {
     title: "Checkout reminders",
-    ask: "Stop all checkout reminder emails from CRAFT & CODE to this address?",
+    ask: "Stop all checkout reminders from CRAFT & CODE to this address (email and WhatsApp)?",
     button: "Unsubscribe",
-    done: "You're unsubscribed. You won't get any more checkout reminders. Emails about a purchase you make (receipt and download link) are not affected.",
+    done: "You're unsubscribed. You won't get any more checkout reminders by email or WhatsApp. Emails about a purchase you make (receipt and download link) are not affected.",
     invalid: "This unsubscribe link isn't valid or has expired. To stop reminders, reply to any reminder email or write to us and we'll do it for you.",
     busy: "Too many requests. Please try again in a few minutes.",
     back: "Back to craftandcode.tech",
   },
   hi: {
     title: "Checkout reminders",
-    ask: "क्या इस address पर CRAFT & CODE के सभी checkout reminder emails बंद कर दें?",
+    ask: "क्या इस address के लिए CRAFT & CODE के सभी checkout reminders (email और WhatsApp) बंद कर दें?",
     button: "Unsubscribe करें",
-    done: "आप unsubscribe हो गए हैं। अब आपको checkout reminders नहीं आएँगे। आपकी किसी ख़रीद के emails (receipt और download link) पर इसका असर नहीं पड़ता।",
+    done: "आप unsubscribe हो गए हैं। अब आपको email या WhatsApp पर checkout reminders नहीं आएँगे। आपकी किसी ख़रीद के emails (receipt और download link) पर इसका असर नहीं पड़ता।",
     invalid: "यह unsubscribe link मान्य नहीं है या expire हो गया है। Reminders बंद करवाने के लिए किसी भी reminder email का जवाब दें या हमें लिखें, हम कर देंगे।",
     busy: "बहुत ज़्यादा requests। कृपया कुछ मिनट बाद फिर कोशिश करें।",
     back: "craftandcode.tech पर वापस जाएँ",
