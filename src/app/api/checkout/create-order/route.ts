@@ -11,10 +11,22 @@ import { getStore } from "@/lib/commerce/store";
  * "Continue checkout" link, which earlier checkout this one resumes. Recorded after the order exists
  * and never allowed to break checkout: if it fails, the order simply has no consent (= no reminders).
  */
-async function recordConsent(orderId: string, email: string, body: Record<string, unknown>) {
+/**
+ * The checkout form is unverified: anyone can type someone else's address. To keep the reminder
+ * opt-in from being used to send mail to strangers, one network address may record reminder
+ * consent for at most 3 checkouts per hour; beyond that the order is created normally but without
+ * consent (= no reminders). Other limits apply too: 3 reminder emails per address in 30 days.
+ */
+const CONSENT_PER_IP = 3;
+const CONSENT_WINDOW_MS = 60 * 60_000;
+
+async function recordConsent(orderId: string, email: string, body: Record<string, unknown>, ip: string) {
   const at = new Date().toISOString();
-  const emailAt = body.remindEmail === true ? at : null;
-  const whatsappAt = body.remindWhatsapp === true ? at : null;
+  const wantsReminders = body.remindEmail === true || body.remindWhatsapp === true;
+  const allowed = !wantsReminders || rateLimit(`consent:${ip}`, CONSENT_PER_IP, CONSENT_WINDOW_MS).ok;
+  if (!allowed) console.warn(`[commerce] reminder consent not recorded for ${orderId}: per-IP opt-in limit reached`);
+  const emailAt = allowed && body.remindEmail === true ? at : null;
+  const whatsappAt = allowed && body.remindWhatsapp === true ? at : null;
   let recoveredFromOrderId: string | null = null;
   try {
     // Attributed only when the link belongs to the same email address.
@@ -74,7 +86,7 @@ export async function POST(request: Request) {
     const rzp = await createRazorpayOrder(id, { internal_order_id: id, product: PRODUCT.id });
     if (rzp.amount !== PRODUCT.amount || rzp.currency !== PRODUCT.currency) throw new Error("Razorpay order amount mismatch");
     await store.createOrder({ id, productId: status.mode === "test" ? `${PRODUCT.id}:test` : PRODUCT.id, customerName: name, customerEmail: email, customerPhone: phone, locale, amount: PRODUCT.amount, currency: PRODUCT.currency, razorpayOrderId: rzp.id });
-    await recordConsent(id, email, body);
+    await recordConsent(id, email, body, ip);
 
     return json({ orderId: id, razorpayOrderId: rzp.id, contact: phone, ownerTest: status.mode === "test", amount: PRODUCT.amount, currency: PRODUCT.currency, mode: status.mode }, 201);
   } catch (e) {

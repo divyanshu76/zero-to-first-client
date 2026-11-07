@@ -52,6 +52,11 @@ Limits:
 - a rolling 24-hour cap (default 30) shared by all reminder sends, so purchase-delivery emails keep
   their Resend quota.
 
+Unverified addresses: the checkout form can't prove an address belongs to the person typing it,
+so one network address may record reminder consent for at most 3 checkouts per hour (beyond that,
+the order is created without consent), and the greeting uses the typed first name only if it is
+made of letters (any script); otherwise it says just "Hi,".
+
 Stopping: an unsubscribe (link or one-click) or a "stop" request recorded by the admin in
 `/admin/recovery` ("Record a stop request") blocks **every** channel for that address: no reminder
 emails and no WhatsApp follow-up. Only a SHA-256 hash of the address is stored.

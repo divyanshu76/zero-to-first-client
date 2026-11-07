@@ -518,3 +518,51 @@ test("24. [L5/M1] unsubscribing from the email link never puts the token in a UR
   await run(o.t0 + 24 * HOUR + MIN);
   expect(await reminders(o.email)).toHaveLength(1);
 });
+
+test("25. [review] a stop request also blocks WhatsApp for a WhatsApp-only customer", async () => {
+  const o = await order("wa-only-stop", { whatsapp: true });
+  const at = o.t0 + 20 * MIN;
+  const dashboard = async () => (await api.get(`/admin/recovery?show=all&q=${encodeURIComponent(o.email)}`, { headers: { ...auth(), "x-recovery-test-now": String(at) } })).text();
+  expect(await dashboard()).toContain(`?whatsapp=${o.orderId}`);
+  expect(await (await adminPost({ action: "stop", email: o.email, confirm: "yes" })).text()).toContain("no more reminder emails or WhatsApp");
+  expect(await dashboard()).not.toContain(`?whatsapp=${o.orderId}`);
+  const res = await api.get(`/admin/recovery?whatsapp=${o.orderId}`, { headers: { ...auth(), "sec-fetch-site": "same-origin", "x-recovery-test-now": String(at) }, maxRedirects: 0 });
+  expect(res.status()).toBe(404);
+  expect(res.headers()["location"]).toBeUndefined();
+});
+
+test("26. [review] the greeting uses the typed name only when it looks like a name", async () => {
+  const cases: [string, string][] = [
+    ["Asha Verma", "Hi Asha,"],
+    ["José-María López", "Hi José-María,"],
+    ["राहुल शर्मा", "Hi राहुल,"],
+    ["evil.com promo", "Hi,"],
+    ["Win₹500 now", "Hi,"],
+    ["Asha2 Verma", "Hi,"],
+  ];
+  for (const [name, greeting] of cases) {
+    const email = newEmail("name");
+    const t0 = Date.now();
+    const res = await api.post("/api/checkout/create-order", { data: { name, email, phone: MOBILE, locale: "en", remindEmail: true }, headers: { "x-forwarded-for": ip() } });
+    expect(res.status()).toBe(201);
+    await run(t0 + 31 * MIN);
+    const [m] = await reminders(email);
+    expect(m.text.split("\n")[0]).toBe(greeting);
+    expect(m.html).not.toContain("evil.com");
+  }
+});
+
+test("27. [review] one network address can record reminder consent for at most 3 checkouts an hour", async () => {
+  const shared = { "x-forwarded-for": ip() };
+  const made: { email: string; t0: number }[] = [];
+  for (let i = 0; i < 4; i++) {
+    const email = newEmail(`iplimit-${i}`);
+    const t0 = Date.now();
+    const res = await api.post("/api/checkout/create-order", { data: { name: "Asha Verma", email, phone: MOBILE, locale: "en", remindEmail: true }, headers: shared });
+    expect(res.status()).toBe(201); // checkout itself is never blocked by this limit
+    made.push({ email, t0 });
+  }
+  await run(made[3].t0 + 31 * MIN);
+  for (const m of made.slice(0, 3)) expect(await reminders(m.email)).toHaveLength(1);
+  expect(await reminders(made[3].email)).toHaveLength(0); // 4th opt-in from the same address wasn't recorded
+});

@@ -23,7 +23,18 @@ export type ReminderEmail = {
 };
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-export const firstName = (name: string) => name.trim().split(/\s+/)[0]?.slice(0, 40) || "";
+/**
+ * The greeting uses the first name only when it looks like a name: letters in any script (with
+ * their combining marks, e.g. Devanagari), optionally joined by an apostrophe or hyphen (no dots), at
+ * most 30 characters. Anything else ("evil.com", "Win₹500", digits, symbols) falls back to a plain
+ * "Hi," — the checkout form is unverified, so its text must not be able to put a link-like or
+ * promotional phrase into a CRAFT & CODE email.
+ */
+const NAME_RE = /^\p{L}[\p{L}\p{M}]*(?:['’-]\p{L}[\p{L}\p{M}]*)*$/u;
+export const firstName = (name: string) => {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  return first.length <= 30 && NAME_RE.test(first) ? first : "";
+};
 
 const copy = {
   en: {

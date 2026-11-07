@@ -448,8 +448,10 @@ export async function recoveryDashboard(orders: Order[], now = Date.now()) {
   for (const o of orders) {
     if (!isUnpaid(o) && o.status !== "processing") continue;
     const emailOrders = byEmail.get(o.customerEmail) ?? [o];
-    if (!suppressed.has(o.customerEmail) && o.emailConsentAt) suppressed.set(o.customerEmail, await store.isSuppressed(emailHash(o.customerEmail)));
-    const ctx: AssessContext = { now, emailOrders, messages: msgsFor(new Set(emailOrders.map((x) => x.id))), suppressed: suppressed.get(o.customerEmail) ?? false };
+    // Every address is checked, whatever it consented to (a stop blocks WhatsApp too), and a failed
+    // lookup counts as "stopped": the dashboard never offers a follow-up it couldn't verify.
+    if (!suppressed.has(o.customerEmail)) suppressed.set(o.customerEmail, await store.isSuppressed(emailHash(o.customerEmail)).catch(() => true));
+    const ctx: AssessContext = { now, emailOrders, messages: msgsFor(new Set(emailOrders.map((x) => x.id))), suppressed: suppressed.get(o.customerEmail) ?? true };
     const a = assess(o, ctx);
     rows.push({ order: o, a, whatsappLink: a.whatsapp ? whatsappUrl(o.customerPhone) : null, messages: ctx.messages.filter((m) => m.orderId === o.id) });
   }

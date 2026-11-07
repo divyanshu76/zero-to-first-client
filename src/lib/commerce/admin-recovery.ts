@@ -312,6 +312,8 @@ export async function recoveryWhatsapp(request: Request, id: string, orders: Ord
   const row = rows.find((r) => r.order.id === id);
   const url = row?.a.whatsapp ? whatsappUrl(row.order.customerPhone) : null;
   if (!row || !url) return notFound("WhatsApp isn't available for this checkout (no WhatsApp consent, already followed up, paid, or not eligible).");
+  // Re-check the stop list right before opening the chat (fail closed if it can't be read).
+  if (await getStore().isSuppressed(emailHash(row.order.customerEmail)).catch(() => true)) return notFound("This customer asked not to be contacted.");
   await logWhatsappOpened(row.order).catch((e) => console.error(`[recovery] whatsapp log failed: ${(e as Error).message}`));
   return new Response(null, { status: 303, headers: { location: url, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }
