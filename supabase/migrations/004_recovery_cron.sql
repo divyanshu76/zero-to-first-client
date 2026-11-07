@@ -13,8 +13,19 @@
 --   * recovery_cron_tick() cannot be called through the API (EXECUTE revoked from every API role).
 -- Rollback: 004_recovery_cron_rollback.sql.
 
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+-- Prerequisite (separate step, run first): enable the extensions the Supabase way, e.g.
+--   create extension if not exists pg_cron with schema pg_catalog;
+--   grant usage on schema cron to postgres;
+--   grant all privileges on all tables in schema cron to postgres;
+--   create extension if not exists pg_net with schema extensions;
+-- (Re-running create extension inside this script once failed in production with
+-- "2BP01 dependent privileges exist"; without those lines the script applies cleanly.)
+do $$
+begin
+  if not exists (select 1 from pg_extension where extname = 'pg_cron') or not exists (select 1 from pg_extension where extname = 'pg_net') then
+    raise exception 'Enable pg_cron and pg_net first (see the prerequisite above).';
+  end if;
+end $$;
 
 do $$
 begin
