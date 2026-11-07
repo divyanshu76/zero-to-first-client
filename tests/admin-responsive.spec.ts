@@ -8,7 +8,7 @@ import { ADMIN, COMMERCE_URL } from "./commerce/env";
  */
 test.skip(!!process.env.PLAYWRIGHT_BASE_URL, "admin tests need the local commerce server");
 
-const PAGES = ["/admin/orders", "/admin/orders?view=orders", "/admin/customers", "/admin/payments", "/admin/ebook", "/admin/email", "/admin/recovery"];
+const PAGES = ["/admin/orders", "/admin/orders?view=orders", "/admin/customers", "/admin/payments", "/admin/ebook", "/admin/email", "/admin/recovery", "/admin/recovery?show=all"];
 const WIDTHS = [360, 390, 430, 768, 1024, 1280, 1440, 1920];
 let detailPath = "";
 
@@ -18,6 +18,8 @@ test.beforeAll(async () => {
   const res = await api.post("/api/checkout/create-order", { data: { name: "Layout Check Customer With A Long Name", email: `layout-${Date.now()}@buyers.test`, phone: "9000000001", locale: "en" } });
   const { orderId } = (await res.json()) as { orderId: string };
   detailPath = `/admin/orders?view=orders&id=${orderId}`;
+  // A consented checkout with a wide row, so the recovery table and history have real content.
+  await api.post("/api/checkout/create-order", { data: { name: "Recovery Layout Customer With A Long Name", email: `layout-rcv-${Date.now()}@buyers.test`, phone: "9000000002", locale: "en", remindEmail: true, remindWhatsapp: true } });
   await api.dispose();
 });
 

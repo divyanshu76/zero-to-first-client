@@ -48,6 +48,8 @@ a{color:inherit}
 .top h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;min-width:0}.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:14px}.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
 .wrap{width:100%;max-width:1440px;margin:0 auto;padding:16px;display:grid;gap:16px}
+/* Grid items default to min-width:auto and would grow to their widest table; let tables scroll in their box instead. */
+.wrap>*,.cols>*,.grid>*,form{min-width:0;max-width:100%}
 /* Cards and stats */
 .grid{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);min-width:0}
