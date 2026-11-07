@@ -3,7 +3,31 @@ import { PRODUCT, checkoutStatus, isTestAllowed } from "@/lib/commerce/config";
 import { badRequest, cleanEmail, cleanLocale, cleanName, cleanPhone, crossSite, fail, json, readJson, sameOrigin } from "@/lib/commerce/http";
 import { clientIp, rateLimit, tooMany } from "@/lib/commerce/rate-limit";
 import { createRazorpayOrder } from "@/lib/commerce/razorpay";
+import { CONSENT_VERSION, resolveResumeToken } from "@/lib/commerce/recovery";
 import { getStore } from "@/lib/commerce/store";
+
+/**
+ * Optional reminder opt-ins (both unticked by default; only an explicit `true` counts) and, for a
+ * "Continue checkout" link, which earlier checkout this one resumes. Recorded after the order exists
+ * and never allowed to break checkout: if it fails, the order simply has no consent (= no reminders).
+ */
+async function recordConsent(orderId: string, email: string, body: Record<string, unknown>) {
+  const at = new Date().toISOString();
+  const emailAt = body.remindEmail === true ? at : null;
+  const whatsappAt = body.remindWhatsapp === true ? at : null;
+  let recoveredFromOrderId: string | null = null;
+  try {
+    // Attributed only when the link belongs to the same email address.
+    const prev = body.resumeToken ? await resolveResumeToken(body.resumeToken) : null;
+    if (prev && prev.customerEmail === email && prev.id !== orderId) recoveredFromOrderId = prev.id;
+  } catch {}
+  if (!emailAt && !whatsappAt && !recoveredFromOrderId) return;
+  try {
+    await getStore().setConsent(orderId, { emailAt, whatsappAt, version: CONSENT_VERSION, recoveredFromOrderId });
+  } catch (e) {
+    console.error(`[commerce] consent not recorded for ${orderId}: ${(e as Error).message}`);
+  }
+}
 
 /**
  * POST /api/checkout/create-order  { name, email, phone, locale }
@@ -50,6 +74,7 @@ export async function POST(request: Request) {
     const rzp = await createRazorpayOrder(id, { internal_order_id: id, product: PRODUCT.id });
     if (rzp.amount !== PRODUCT.amount || rzp.currency !== PRODUCT.currency) throw new Error("Razorpay order amount mismatch");
     await store.createOrder({ id, productId: status.mode === "test" ? `${PRODUCT.id}:test` : PRODUCT.id, customerName: name, customerEmail: email, customerPhone: phone, locale, amount: PRODUCT.amount, currency: PRODUCT.currency, razorpayOrderId: rzp.id });
+    await recordConsent(id, email, body);
 
     return json({ orderId: id, razorpayOrderId: rzp.id, contact: phone, ownerTest: status.mode === "test", amount: PRODUCT.amount, currency: PRODUCT.currency, mode: status.mode }, 201);
   } catch (e) {

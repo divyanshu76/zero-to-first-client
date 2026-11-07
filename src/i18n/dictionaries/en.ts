@@ -501,6 +501,12 @@ export const en = {
     policyLinks: ["Terms", "Refund", "Delivery", "Privacy"],
     alreadyBought: "Already bought it?",
     alreadyBoughtLink: "Get a fresh download link",
+    consentTitle: "Optional reminders",
+    consentEmail: "Email me up to 2 reminders about this checkout if I don't finish it. I can unsubscribe anytime.",
+    consentWhatsapp: "CRAFT & CODE may message me once on WhatsApp about this checkout.",
+    consentNote: "Optional: you can buy without ticking these.",
+    resumed: "Welcome back! Your details are filled in. Check them, then continue to payment.",
+    resumeExpired: "That checkout link has expired or is no longer valid. You can start a fresh checkout here.",
     errors: {
       invalid_name: "Please enter your name (2–100 characters).",
       invalid_email: "Please enter a valid email address.",

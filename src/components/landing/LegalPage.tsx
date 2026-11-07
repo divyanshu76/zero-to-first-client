@@ -51,7 +51,7 @@ export function policyHelpers(locale: Locale): PolicyHelpers {
   return { locale, L, Pending, SellerIdentity, SupportContact };
 }
 
-export function LegalPage({ locale, title, summary, children }: { locale: Locale; title: string; summary: ReactNode; children: ReactNode }) {
+export function LegalPage({ locale, title, summary, children, updated }: { locale: Locale; title: string; summary: ReactNode; children: ReactNode; updated?: string }) {
   const dict = getDictionary(locale);
   const t = dict.legal;
   return (
@@ -69,7 +69,7 @@ export function LegalPage({ locale, title, summary, children }: { locale: Locale
       </header>
       <main className="container-page max-w-3xl py-12 lg:py-16">
         <h1 className="text-[clamp(2rem,4vw,2.9rem)] font-extrabold text-ink">{title}</h1>
-        <p className="mt-2 text-sm text-ink-2">{fmt(t.updated, { date: POLICY_UPDATED[locale] })}</p>
+        <p className="mt-2 text-sm text-ink-2">{fmt(t.updated, { date: updated ?? POLICY_UPDATED[locale] })}</p>
         <p className="mt-5 text-[1.05rem] leading-relaxed text-ink">{summary}</p>
         {!legalReviewed ? (
           <p role="note" className="mt-6 rounded-2xl border border-dashed border-line-strong bg-white px-5 py-4 text-sm leading-relaxed text-ink-2">{t.draft}</p>

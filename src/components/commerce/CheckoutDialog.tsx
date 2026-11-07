@@ -19,7 +19,10 @@ const EMAIL = /^[^\s@"<>()[\],;:]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}
  * Collects name + email, creates the order on the server, then opens Razorpay Standard
  * Checkout. Success is decided only by /api/checkout/verify, never by this component.
  */
-export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; config: Extract<CheckoutConfig, { enabled: true }>; open: boolean; onClose: () => void }) {
+/** Details from a "Continue checkout" reminder link (see BuyButton). The token links the new order to the old one. */
+export type ResumePrefill = { name: string; email: string; phone: string; token: string } | { expired: true };
+
+export function CheckoutDialog({ t, config, open, onClose, resume = null }: { t: Strings; config: Extract<CheckoutConfig, { enabled: true }>; open: boolean; onClose: () => void; resume?: ResumePrefill | null }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<ErrorKey | null>(null);
@@ -28,7 +31,8 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
   // Set only after the SERVER accepted an allowlisted email in Test Mode (create-order returned 201).
   const [ownerTest, setOwnerTest] = useState(false);
   const busy = useRef(false);
-  const ids = { title: useId(), name: useId(), email: useId(), phone: useId(), phoneHint: useId(), hint: useId(), err: useId() };
+  const ids = { title: useId(), name: useId(), email: useId(), phone: useId(), phoneHint: useId(), hint: useId(), err: useId(), consent: useId() };
+  const prefill = resume && !("expired" in resume) ? resume : null;
 
   const locale = typeof document !== "undefined" && document.documentElement.lang === "hi" ? "hi" : "en";
   const href = (p: string) => (locale === "hi" ? `/hi${p}` : p);
@@ -66,7 +70,13 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
     let Razorpay: Awaited<ReturnType<typeof loadRazorpay>>;
     try {
       [order, Razorpay] = await Promise.all([
-        postJson<typeof order>("/api/checkout/create-order", { name, email, phone: mobile, locale, website: f.get("website") }),
+        postJson<typeof order>("/api/checkout/create-order", {
+          name, email, phone: mobile, locale, website: f.get("website"),
+          // Opt-in only: both boxes start unticked; the server records consent only for an explicit true.
+          remindEmail: f.get("remind_email") === "yes",
+          remindWhatsapp: f.get("remind_whatsapp") === "yes",
+          ...(prefill ? { resumeToken: prefill.token } : {}),
+        }),
         loadRazorpay(),
       ]);
     } catch (err) {
@@ -154,6 +164,11 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
           </button>
         </div>
         <p className="mt-3 text-sm leading-relaxed text-ink-2">{t.intro}</p>
+        {resume ? (
+          <p role="status" className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold leading-relaxed ${prefill ? "bg-violet-soft text-violet" : "bg-amber-50 text-amber-900"}`} data-testid="resume-note">
+            {prefill ? t.resumed : t.resumeExpired}
+          </p>
+        ) : null}
 
         <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3 text-sm">
           <span className="min-w-0 text-ink-2">{t.product}</span>
@@ -162,13 +177,13 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
 
         <label htmlFor={ids.name} className="mt-5 block text-sm font-semibold">{t.nameLabel}</label>
         <input
-          id={ids.name} name="name" autoComplete="name" required minLength={2} maxLength={100} disabled={working}
+          id={ids.name} name="name" autoComplete="name" required minLength={2} maxLength={100} disabled={working} defaultValue={prefill?.name}
           aria-invalid={fieldError === "name"} aria-describedby={fieldError === "name" ? ids.err : undefined}
           className="mt-1.5 h-12 w-full rounded-xl border border-line-strong bg-white px-3.5 text-base outline-none focus:border-violet focus:ring-2 focus:ring-violet/25 aria-[invalid=true]:border-red-500"
         />
         <label htmlFor={ids.email} className="mt-4 block text-sm font-semibold">{t.emailLabel}</label>
         <input
-          id={ids.email} name="email" type="email" inputMode="email" autoComplete="email" required maxLength={254} disabled={working}
+          id={ids.email} name="email" type="email" inputMode="email" autoComplete="email" required maxLength={254} disabled={working} defaultValue={prefill?.email}
           aria-invalid={fieldError === "email"} aria-describedby={`${ids.hint}${fieldError === "email" ? ` ${ids.err}` : ""}`}
           className="mt-1.5 h-12 w-full rounded-xl border border-line-strong bg-white px-3.5 text-base outline-none focus:border-violet focus:ring-2 focus:ring-violet/25 aria-[invalid=true]:border-red-500"
         />
@@ -177,12 +192,24 @@ export function CheckoutDialog({ t, config, open, onClose }: { t: Strings; confi
         <div className="mt-1.5 flex h-12 w-full items-stretch overflow-hidden rounded-xl border border-line-strong bg-white focus-within:border-violet focus-within:ring-2 focus-within:ring-violet/25 has-[[aria-invalid=true]]:border-red-500">
           <span aria-hidden className="grid place-items-center border-r border-line bg-paper px-3 text-base text-ink-2">+91</span>
           <input
-            id={ids.phone} name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" required maxLength={16} disabled={working}
+            id={ids.phone} name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" required maxLength={16} disabled={working} defaultValue={prefill?.phone}
             aria-invalid={fieldError === "phone"} aria-describedby={`${ids.phoneHint}${fieldError === "phone" ? ` ${ids.err}` : ""}`}
             className="min-w-0 flex-1 bg-transparent px-3.5 text-base outline-none"
           />
         </div>
         <p id={ids.phoneHint} className="mt-1.5 text-xs text-ink-2">{t.phoneHint}</p>
+        <fieldset className="mt-4 rounded-2xl border border-line px-3.5 pt-2 pb-3" aria-describedby={ids.consent}>
+          <legend className="px-1 text-xs font-semibold text-ink-2">{t.consentTitle}</legend>
+          <label className="flex items-start gap-2.5 text-xs leading-relaxed text-ink">
+            <input type="checkbox" name="remind_email" value="yes" disabled={working} className="mt-0.5 size-4 shrink-0 accent-violet" data-testid="consent-email" />
+            <span>{t.consentEmail}</span>
+          </label>
+          <label className="mt-2 flex items-start gap-2.5 text-xs leading-relaxed text-ink">
+            <input type="checkbox" name="remind_whatsapp" value="yes" disabled={working} className="mt-0.5 size-4 shrink-0 accent-violet" data-testid="consent-whatsapp" />
+            <span>{t.consentWhatsapp}</span>
+          </label>
+          <p id={ids.consent} className="mt-2 text-[0.7rem] text-ink-2">{t.consentNote}</p>
+        </fieldset>
         {/* Honeypot for bots; hidden from people and assistive tech. */}
         <input name="website" tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] size-px opacity-0" />
 

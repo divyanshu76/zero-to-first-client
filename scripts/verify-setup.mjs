@@ -41,6 +41,8 @@ for (const [k, want] of [["COMMERCE_STORE", "supabase"], ["COMMERCE_STORAGE", "s
 if (env("CHECKOUT_ENABLED") === "true" && !env("CHECKOUT_TEST_EMAILS")) warn.push("CHECKOUT_ENABLED=true but CHECKOUT_TEST_EMAILS is empty: Test Mode checkout stays closed.");
 if (env("CHECKOUT_LIVE_APPROVED") === "true") warn.push("CHECKOUT_LIVE_APPROVED=true: live payments are allowed. Do not set this before merchant activation.");
 if (env("RAZORPAY_KEY_ID")?.startsWith("rzp_live_")) warn.push("RAZORPAY_KEY_ID is a LIVE key.");
+if ((env("RECOVERY_CRON_SECRET") ?? "").length > 0 && env("RECOVERY_CRON_SECRET").length < 32) warn.push("RECOVERY_CRON_SECRET is shorter than 32 characters, so the recovery scheduler refuses every call.");
+if (!env("RECOVERY_CRON_SECRET")) warn.push("RECOVERY_CRON_SECRET is not set: checkout-recovery scheduling is disabled (manual reminders still work).");
 if (env("EMAIL_ATTACH_EBOOK") === "true") warn.push("EMAIL_ATTACH_EBOOK=true: the ebook PDF is attached to customer emails.");
 console.log(warn.length ? ["[Warnings]", ...warn.map((w) => `  ! ${w}`)].join("\n") : "[Warnings] none");
 console.log("");

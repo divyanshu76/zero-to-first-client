@@ -110,6 +110,26 @@ export function localStorageSecret() {
   return env("LOCAL_STORAGE_SECRET") ?? env("RAZORPAY_WEBHOOK_SECRET");
 }
 
+/**
+ * Checkout recovery. RECOVERY_CRON_SECRET is a dedicated random value (also kept in Supabase Vault)
+ * used only to verify the scheduler's HMAC signature; it is never the Supabase service-role key.
+ * CRON_SECRET is the bearer token Vercel Cron sends to the daily watchdog.
+ * Both fail closed: when unset (or shorter than 32 characters) the endpoints refuse every call.
+ */
+export const recoveryCronSecret = () => {
+  const v = env("RECOVERY_CRON_SECRET");
+  return v && v.length >= 32 ? v : null;
+};
+export const vercelCronSecret = () => {
+  const v = env("CRON_SECRET");
+  return v && v.length >= 16 ? v : null;
+};
+/**
+ * Tests only: lets the automated suite move the recovery clock forward. Refused on Vercel and
+ * whenever live Razorpay keys are configured, so it can never affect the real store.
+ */
+export const recoveryClockOverrideAllowed = () => !process.env.VERCEL && env("RECOVERY_TEST_CLOCK") === "true" && razorpayKeys().mode !== "live";
+
 export const ADMIN_PASSWORD_MIN = 9;
 export const ADMIN_PASSWORD_MAX = 10;
 

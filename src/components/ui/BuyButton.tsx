@@ -5,7 +5,8 @@ import { Clock, Loader2 } from "lucide-react";
 import { isPurchasable, pricing, type CurrencyCode } from "@/data/product";
 import type { Dictionary } from "@/i18n/dictionaries/en";
 import dynamic from "next/dynamic";
-import { loadCheckoutConfig, type CheckoutConfig } from "@/components/commerce/checkout-client";
+import { loadCheckoutConfig, postJson, type CheckoutConfig } from "@/components/commerce/checkout-client";
+import type { ResumePrefill } from "@/components/commerce/CheckoutDialog";
 
 // Loaded only when checkout is enabled, so the landing page's JavaScript doesn't grow.
 const CheckoutDialog = dynamic(() => import("@/components/commerce/CheckoutDialog").then((m) => m.CheckoutDialog), { ssr: false });
@@ -26,6 +27,8 @@ type Props = {
   noticeAlign?: "left" | "center";
   /** Strings for the on-site Razorpay checkout. Used only when the server reports checkout as enabled. */
   checkout?: Dictionary["checkout"];
+  /** This button opens the checkout for a "Continue checkout" reminder link (#resume=…). Set on one button per page. */
+  resumeHost?: boolean;
 };
 
 const base =
@@ -42,7 +45,7 @@ const sizes = { md: "h-12 px-6 text-[0.95rem]", lg: "h-14 px-8 text-base" };
  * submission) and shows a loading state. Without one it explains that checkout isn't
  * open. It never simulates a purchase; payment is confirmed server-side by the provider.
  */
-export function BuyButton({ label, notice, redirecting: redirectingLabel, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left", checkout }: Props) {
+export function BuyButton({ label, notice, redirecting: redirectingLabel, currency = "INR", variant = "primary", size = "lg", className = "", noticeAlign = "left", checkout, resumeHost = false }: Props) {
   const preferred = pricing[currency];
   const target = isPurchasable(preferred) ? preferred : isPurchasable(pricing.INR) ? pricing.INR : isPurchasable(pricing.USD) ? pricing.USD : null;
   const [open, setOpen] = useState(false);
@@ -50,6 +53,7 @@ export function BuyButton({ label, notice, redirecting: redirectingLabel, curren
   const noticeId = useId();
   const [config, setConfig] = useState<CheckoutConfig | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [resume, setResume] = useState<ResumePrefill | null>(null);
 
   // Checkout availability is decided by the server at request time (no rebuild to switch it on or off).
   useEffect(() => {
@@ -60,6 +64,25 @@ export function BuyButton({ label, notice, redirecting: redirectingLabel, curren
       live = false;
     };
   }, [checkout]);
+
+  // "Continue checkout" from a reminder email: /#resume=<token>. The token stays in the fragment, so it
+  // never reaches server logs; it is read once, removed from the address bar, and checked by the server.
+  const configEnabled = config?.enabled === true;
+  useEffect(() => {
+    if (!resumeHost || !configEnabled) return;
+    const m = /^#resume=([A-Za-z0-9_-]{43})$/.exec(window.location.hash);
+    if (!m) return;
+    history.replaceState(null, "", `${window.location.pathname}${window.location.search}#pricing`);
+    document.getElementById("pricing")?.scrollIntoView({ block: "start" });
+    let live = true;
+    postJson<{ name: string; email: string; phone: string }>("/api/recovery/resume", { token: m[1] })
+      .then((d) => live && setResume({ ...d, token: m[1] }))
+      .catch(() => live && setResume({ expired: true }))
+      .finally(() => live && setDialogOpen(true));
+    return () => {
+      live = false;
+    };
+  }, [resumeHost, configEnabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,7 +105,18 @@ export function BuyButton({ label, notice, redirecting: redirectingLabel, curren
         <button type="button" className={cls} aria-haspopup="dialog" onClick={() => setDialogOpen(true)} data-checkout="razorpay">
           {label}
         </button>
-        {dialogOpen ? <CheckoutDialog t={checkout} config={config} open={dialogOpen} onClose={() => setDialogOpen(false)} /> : null}
+        {dialogOpen ? (
+          <CheckoutDialog
+            t={checkout}
+            config={config}
+            open={dialogOpen}
+            resume={resume}
+            onClose={() => {
+              setDialogOpen(false);
+              setResume(null);
+            }}
+          />
+        ) : null}
       </>
     );
   }

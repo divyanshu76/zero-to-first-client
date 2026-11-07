@@ -8,6 +8,8 @@ export const COMMERCE_PORT = 3301;
 export const TEST_KEY_SECRET = "mock-key-secret-not-a-real-credential";
 export const TEST_WEBHOOK_SECRET = "mock-webhook-secret-not-a-real-credential";
 export const TEST_STORAGE_SECRET = "mock-storage-secret-not-a-real-credential";
+export const TEST_RECOVERY_SECRET = "mock-recovery-cron-secret-not-a-real-credential";
+export const TEST_CRON_SECRET = "mock-vercel-cron-secret-not-real";
 export const ADMIN = { user: "admin", pass: "Mock-Pw-91" }; // 10 characters: within the 9–10 rule
 export const MOCK = `http://127.0.0.1:${MOCK_PORT}`;
 export const COMMERCE_URL = `http://localhost:${COMMERCE_PORT}`;
@@ -33,4 +35,8 @@ export const commerceEnv: Record<string, string> = {
   ADMIN_USER: ADMIN.user,
   ADMIN_PASSWORD: ADMIN.pass,
   APP_ORIGIN: COMMERCE_URL,
+  RECOVERY_CRON_SECRET: TEST_RECOVERY_SECRET,
+  CRON_SECRET: TEST_CRON_SECRET,
+  // Lets the suite move the recovery clock forward (refused on Vercel and with live keys).
+  RECOVERY_TEST_CLOCK: "true",
 };

@@ -8,6 +8,7 @@ import { clientIp, isLimited, rateLimit, recordHit, refundHit } from "@/lib/comm
 import { ebookStorageStatus } from "@/lib/commerce/storage";
 import { getStore, type Order, type OrderStatus } from "@/lib/commerce/store";
 import { badge, esc, inr, isTestOrder, ist, istDate, layout, ordersTable, stat, testTag, type View } from "@/lib/commerce/admin-ui";
+import { recoveryAction, recoveryNow, recoveryTestBudget, recoveryView, recoveryWhatsapp } from "@/lib/commerce/admin-recovery";
 
 /**
  * Admin dashboard: /admin/orders (HTTP Basic auth with ADMIN_USER / ADMIN_PASSWORD).
@@ -113,7 +114,7 @@ async function gate(request: Request): Promise<Response | { user: string }> {
   return a;
 }
 
-const VIEWS: View[] = ["overview", "orders", "customers", "payments", "ebook", "email"];
+const VIEWS: View[] = ["overview", "orders", "customers", "payments", "ebook", "email", "recovery"];
 const STATUSES: OrderStatus[] = ["pending", "processing", "paid", "failed", "cancelled", "refunded"];
 const PER_PAGE = 25;
 const MAX_ROWS = 1000;
@@ -285,7 +286,7 @@ ${owner && cfg ? `<form method="post" class="f"><input type="hidden" name="actio
 
 /* ── Handlers ────────────────────────────────────────────────────────── */
 
-async function render(request: Request, user: string, notice: { tone: "ok" | "bad" | "warn" | "info"; text: string } | null = null, forcedView?: View) {
+async function render(request: Request, user: string, notice: { tone: "ok" | "bad" | "warn" | "info"; text: string } | null = null, forcedView?: View, page?: { title: string; body: string }) {
   const u = new URL(request.url);
   const view = (forcedView ?? (VIEWS.includes(u.searchParams.get("view") as View) ? u.searchParams.get("view") : "overview")) as View;
   const id = u.searchParams.get("id");
@@ -296,9 +297,18 @@ async function render(request: Request, user: string, notice: { tone: "ok" | "ba
   } catch (e) {
     return new Response(layout({ view, title: "Database unavailable", user, status: statusBar(), body: `<p class="note bad">Could not load orders: ${esc((e as Error).message)}</p>` }), { status: 503, headers: HEADERS });
   }
-  let title = { overview: "Overview", orders: "Orders", customers: "Customers", payments: "Payments", ebook: "Ebook", email: "Email" }[view];
+  let title = { overview: "Overview", orders: "Orders", customers: "Customers", payments: "Payments", ebook: "Ebook", email: "Email", recovery: "Checkout Recovery" }[view];
   let body: string;
-  if (view === "orders" && id) {
+  if (page) {
+    title = page.title;
+    body = page.body;
+  } else if (view === "recovery") {
+    try {
+      body = await recoveryView(u, orders, recoveryNow(request));
+    } catch (e) {
+      body = `<p class="note bad">Checkout Recovery is unavailable: ${esc((e as Error).message)}. If migration 003 hasn't been run yet, run it first (docs/CHECKOUT_RECOVERY.md).</p>`;
+    }
+  } else if (view === "orders" && id) {
     const o = /^ord_[a-f0-9]{24}$/.test(id) ? await getStore().getOrder(id) : null;
     title = o ? `Order ${o.id}` : "Order not found";
     body = o ? orderDetail(o) : `<p class="note warn">No order with that ID.</p><p><a class="btn" href="/admin/orders?view=orders">← Orders</a></p>`;
@@ -311,12 +321,14 @@ async function render(request: Request, user: string, notice: { tone: "ok" | "ba
   return new Response(layout({ view, title, user, status: statusBar(), body, notice }), { headers: HEADERS });
 }
 
-export const ADMIN_SECTIONS = ["overview", "customers", "payments", "ebook", "email"] as const;
+export const ADMIN_SECTIONS = ["overview", "customers", "payments", "ebook", "email", "recovery"] as const;
 
 /** GET for /admin/orders (view from ?view=) and /admin/<section> (view fixed by the path). */
 export async function adminGet(request: Request, forcedView?: View) {
   const g = await gate(request);
   if (g instanceof Response) return g;
+  const wa = forcedView === "recovery" ? new URL(request.url).searchParams.get("whatsapp") : null;
+  if (wa !== null) return recoveryWhatsapp(request, wa, await getStore().listOrders(MAX_ROWS), recoveryNow(request));
   return render(request, g.user, null, forcedView);
 }
 
@@ -335,6 +347,16 @@ export async function adminPost(request: Request, forcedView?: View) {
     return new Response("Request blocked: this action must be sent from the admin page itself.", { status: 403, headers: NO_STORE });
   }
   const form = await request.formData().catch(() => null);
+  if (forcedView === "recovery") {
+    if (!form) return render(request, g.user, { tone: "bad", text: "The form could not be read." }, forcedView);
+    try {
+      const r = await recoveryAction(form, await getStore().listOrders(MAX_ROWS), recoveryNow(request), recoveryTestBudget(request));
+      return "body" in r ? render(request, g.user, r.notice ?? null, forcedView, r) : render(request, g.user, r.notice, forcedView);
+    } catch (e) {
+      console.error(`[admin] recovery action failed: ${(e as Error).message}`);
+      return render(request, g.user, { tone: "bad", text: `Action failed: ${(e as Error).message}` }, forcedView);
+    }
+  }
   const action = String(form?.get("action") ?? "");
   const confirmed = form?.get("confirm") === "yes";
   if (!confirmed) return render(request, g.user, { tone: "warn", text: "Nothing was done: please tick the confirmation box." }, forcedView);

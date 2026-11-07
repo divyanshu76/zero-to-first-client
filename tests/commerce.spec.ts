@@ -695,10 +695,22 @@ test.describe("admin", () => {
   });
 
   test("a test email creates no order, no receipt and no ebook link", async () => {
-    const ordersBefore = ((await (await mock.get("/__control/orders")).json()) as unknown[]).length;
+    // The mock Razorpay server is shared by every worker, so other tests may create orders while this
+    // one runs. Instead of comparing a global count, attribute every order created in the window.
+    type MockOrder = { id: string; receipt: string };
+    const listOrders = async () => (await (await mock.get("/__control/orders")).json()) as MockOrder[];
+    const before = new Set((await listOrders()).map((o) => o.id));
     await api.post("/admin/email", { headers: auth(), form: { action: "test-email", confirm: "yes" } });
-    const ordersAfter = ((await (await mock.get("/__control/orders")).json()) as unknown[]).length;
-    expect(ordersAfter).toBe(ordersBefore);
+    const created = (await listOrders()).filter((o) => !before.has(o.id));
+    // Any order that appeared meanwhile must be another test's real checkout (a stored order for a
+    // buyer), never one made for the owner address the test email went to.
+    for (const o of created) {
+      const detail = () => api.get(`/admin/orders?view=orders&id=${o.receipt}`, { headers: auth() }).then((r) => r.text());
+      await expect.poll(async () => (await detail()).includes("Order not found"), { timeout: 15000, message: `order ${o.id} has no stored checkout behind it` }).toBe(false);
+      expect(await detail()).not.toContain("owner@buyers.test");
+    }
+    const ownerOrders = await (await api.get(`/admin/orders?view=orders&q=${encodeURIComponent("owner@buyers.test")}`, { headers: auth() })).text();
+    expect(ownerOrders).toContain("No orders match");
     const tests = (await emailsTo("owner@buyers.test")).filter((m) => m.subject === "CRAFT & CODE — Email Integration Test");
     for (const m of tests) {
       expect(m.attachments.map((a) => a.filename)).toEqual(["craft-and-code-logo.jpg"]);

@@ -13,7 +13,7 @@ export const inr = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN"
 export const istDate = (s: string) => new Date(s).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
 export const ist = (s: string | null) => (s ? `${new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}` : "—");
 
-export type View = "overview" | "orders" | "customers" | "payments" | "ebook" | "email";
+export type View = "overview" | "orders" | "customers" | "payments" | "ebook" | "email" | "recovery";
 const NAV: [View, string, string][] = [
   ["overview", "Overview", "M3 12h7V3H3zm11 9h7v-9h-7zM3 21h7v-6H3zm11-12h7V3h-7z"],
   ["orders", "Orders", "M4 6h16M4 12h16M4 18h10"],
@@ -21,10 +21,11 @@ const NAV: [View, string, string][] = [
   ["payments", "Payments", "M2 7h20v12H2zM2 11h20M6 15h4"],
   ["ebook", "Ebook", "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"],
   ["email", "Email", "M4 4h16v16H4zM4 6l8 7 8-7"],
+  ["recovery", "Checkout Recovery", "M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"],
 ];
 const icon = (d: string, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 
-const STATUS_TONE: Record<string, string> = { paid: "ok", sent: "ok", processing: "warn", pending: "muted", sending: "warn", failed: "bad", cancelled: "muted", refunded: "bad", skipped: "muted" };
+const STATUS_TONE: Record<string, string> = { paid: "ok", sent: "ok", processing: "warn", pending: "muted", sending: "warn", failed: "bad", cancelled: "muted", refunded: "bad", skipped: "muted", eligible: "ok", recovered: "ok", opened: "ok", waiting: "warn", purchased: "muted", ineligible: "muted", running: "warn", error: "bad" };
 export const isTestOrder = (o: Pick<Order, "productId">) => o.productId.endsWith(":test");
 export const testTag = (o: Pick<Order, "productId">) => (isTestOrder(o) ? ' <span class="b warn" title="Razorpay Test Mode order: no real money">TEST</span>' : "");
 export const badge = (s: string) => `<span class="b ${STATUS_TONE[s] ?? "muted"}">${esc(s)}</span>`;

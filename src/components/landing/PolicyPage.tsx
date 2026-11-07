@@ -9,7 +9,7 @@ export function PolicyPage({ slug, locale }: { slug: PolicySlug; locale: Locale 
   const c = policies[slug][locale];
   const h = policyHelpers(locale);
   return (
-    <LegalPage locale={locale} title={c.title} summary={c.summary(h)}>
+    <LegalPage locale={locale} title={c.title} summary={c.summary(h)} updated={c.updated}>
       {c.body(h)}
     </LegalPage>
   );

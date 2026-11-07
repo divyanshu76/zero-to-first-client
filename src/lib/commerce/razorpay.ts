@@ -66,6 +66,17 @@ export function fetchRazorpayPayment(paymentId: string) {
   return call<RazorpayPayment>("GET", `/v1/payments/${paymentId}`);
 }
 
+/**
+ * Every payment attempt made against one Razorpay order (used before a checkout reminder, when we
+ * may not know any payment id yet: a delayed or missed webhook must never lead to a reminder).
+ */
+export async function fetchRazorpayOrderPayments(razorpayOrderId: string) {
+  if (!/^order_[A-Za-z0-9]+$/.test(razorpayOrderId)) throw new RazorpayError("Invalid order id", 400);
+  const res = await call<{ items?: RazorpayPayment[] }>("GET", `/v1/orders/${razorpayOrderId}/payments`);
+  if (!Array.isArray(res.items)) throw new RazorpayError("Unexpected Razorpay response", 502);
+  return res.items;
+}
+
 /** A payment counts only if it belongs to our order, for the exact amount and currency. */
 export function paymentMatchesOrder(p: RazorpayPayment, razorpayOrderId: string) {
   return p.order_id === razorpayOrderId && p.amount === PRODUCT.amount && p.currency === PRODUCT.currency;

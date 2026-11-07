@@ -503,6 +503,12 @@ export const hi: Dictionary = {
     policyLinks: ["शर्तें", "Refund", "Delivery", "Privacy"],
     alreadyBought: "पहले ख़रीद चुके हैं?",
     alreadyBoughtLink: "नया download link पाएँ",
+    consentTitle: "वैकल्पिक reminders",
+    consentEmail: "अगर मैं यह checkout पूरा न करूँ, तो इसके बारे में मुझे ज़्यादा से ज़्यादा 2 reminders email करें। मैं कभी भी unsubscribe कर सकता/सकती हूँ।",
+    consentWhatsapp: "CRAFT & CODE इस checkout के बारे में मुझे एक बार WhatsApp पर message कर सकता है।",
+    consentNote: "वैकल्पिक: इन्हें tick किए बिना भी आप ख़रीद सकते हैं।",
+    resumed: "फिर से स्वागत है! आपकी details भर दी गई हैं। उन्हें जाँचें, फिर payment पर आगे बढ़ें।",
+    resumeExpired: "यह checkout link expire हो गया है या अब मान्य नहीं है। आप यहाँ नया checkout शुरू कर सकते हैं।",
     errors: {
       invalid_name: "कृपया अपना नाम लिखें (2–100 अक्षर)।",
       invalid_email: "कृपया सही email address लिखें।",

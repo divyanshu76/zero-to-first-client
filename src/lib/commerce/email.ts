@@ -10,8 +10,8 @@ import { formatIst, receiptNumber } from "./receipt";
 export type Attachment = { filename: string; content: Buffer; /** Inline image referenced as cid:<contentId>. */ contentId?: string };
 
 /** The logo travels as an inline (CID) attachment: remote images are often blocked and data: URIs are stripped. */
-const LOGO_CID = "craftcode-logo";
-const logoAttachment = (): Attachment[] =>
+export const LOGO_CID = "craftcode-logo";
+export const logoAttachment = (): Attachment[] =>
   BRAND_LOGO ? [{ filename: `craft-and-code-logo.${BRAND_LOGO.mime === "image/png" ? "png" : "jpg"}`, content: Buffer.from(BRAND_LOGO.base64, "base64"), contentId: LOGO_CID }] : [];
 
 export type DeliveryEmail = {
@@ -164,7 +164,7 @@ ${how.map((h) => `<p style="margin:6px 0;font-size:14px;line-height:1.6;color:#3
 }
 
 /** Outbox (no provider configured): kept in memory for local development and tests. */
-const g = globalThis as unknown as { __ztfcOutbox?: (Omit<DeliveryEmail, "attachments"> & { subject: string; at: string; attachmentNames: string[]; text?: string; html?: string })[] };
+const g = globalThis as unknown as { __ztfcOutbox?: (Omit<DeliveryEmail, "attachments" | "kind"> & { kind: DeliveryEmail["kind"] | "recovery"; subject: string; at: string; attachmentNames: string[]; text?: string; html?: string })[] };
 export const outbox = () => (g.__ztfcOutbox ??= []);
 
 export type OwnerNotificationEmail = {

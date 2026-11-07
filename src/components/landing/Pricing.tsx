@@ -82,7 +82,7 @@ export function Pricing({ t, buy, book, locale }: { t: Dictionary["pricing"]; bu
             </ul>
 
             <div className="mt-7">
-              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} checkout={buy.checkout} currency={currency} className="w-full sm:w-auto" />
+              <BuyButton label={t.cta} notice={buy.notice} redirecting={buy.redirecting} checkout={buy.checkout} currency={currency} className="w-full sm:w-auto" resumeHost />
             </div>
 
             {/* One grid for both rows: icons share a column, texts share one left edge, icons align to the first line. */}

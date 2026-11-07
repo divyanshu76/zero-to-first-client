@@ -8,6 +8,8 @@ export type PolicyLocaleContent = {
   description: string;
   summary: (h: PolicyHelpers) => ReactNode;
   body: (h: PolicyHelpers) => ReactNode;
+  /** Overrides the shared "Last updated" date when only this policy changed. */
+  updated?: string;
 };
 
 /** Every policy must exist in every locale; a missing language is a type error. */
