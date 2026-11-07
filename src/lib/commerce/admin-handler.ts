@@ -115,7 +115,8 @@ async function gate(request: Request): Promise<Response | { user: string }> {
 }
 
 const VIEWS: View[] = ["overview", "orders", "customers", "payments", "ebook", "email", "recovery"];
-const STATUSES: OrderStatus[] = ["pending", "processing", "paid", "failed", "cancelled", "refunded"];
+// Status filter options. Refunds aren't processed by this store, so there is no refund filter.
+const STATUSES: OrderStatus[] = ["pending", "processing", "paid", "failed", "cancelled"];
 const PER_PAGE = 25;
 const MAX_ROWS = 1000;
 
@@ -178,8 +179,8 @@ ${stat("Revenue", inr(revenue), testRevenue ? `verified live orders · ${inr(tes
 ${stat("Successful payments", String(paid.length))}
 ${stat("Customers", String(customers), "unique paying emails")}
 ${stat("Pending", String(count(["pending", "processing"])), "awaiting payment / confirmation")}
-${stat("Failed", String(count(["failed"])), `${count(["cancelled"])} cancelled`)}
-${stat("Refunded", String(count(["refunded"])), "access revoked")}
+${stat("Failed", String(count(["failed"])), "payment attempt declined")}
+${stat("Cancelled", String(count(["cancelled"])), "payment window closed")}
 ${stat("Ebook downloads", String(downloads), "signed-link downloads")}
 </section>
 <section class="card"><h2>Recent orders</h2>${ordersTable(orders.slice(0, 8), { compact: true })}<p class="pg"><span></span><a class="btn" href="/admin/orders?view=orders">All orders →</a></p></section>`;
@@ -203,12 +204,12 @@ ${ordersTable(rows)}
 }
 
 function orderDetail(o: Order) {
-  const access = o.status === "paid" ? badge("paid") + " access active" : o.status === "refunded" ? badge("refunded") + " access revoked" : badge(o.status) + " no access";
+  const access = o.status === "paid" ? badge("paid") + " access active" : badge(o.status) + " no access";
   const canRetry = o.status === "paid" && (o.emailStatus !== "sent" || (!!ownerEmail() && o.ownerEmailStatus !== "sent"));
   return `<p><a class="btn" href="/admin/orders?view=orders">← Orders</a></p>
 <div class="cols">
 <section class="card"><h2>Customer</h2><dl class="kv"><dt>Name</dt><dd>${esc(o.customerName)}</dd><dt>Email</dt><dd>${esc(o.customerEmail)}</dd><dt>Mobile</dt><dd>${esc(o.customerPhone ?? "—")}</dd><dt>Language</dt><dd>${o.locale === "hi" ? "Hindi" : "English"}</dd><dt>All orders</dt><dd><a href="/admin/orders?view=orders&amp;q=${encodeURIComponent(o.customerEmail)}">View purchase history</a></dd></dl></section>
-<section class="card"><h2>Payment</h2><dl class="kv"><dt>Order ID</dt><dd><code>${esc(o.id)}</code>${testTag(o)}</dd><dt>Razorpay order</dt><dd><code>${esc(o.razorpayOrderId)}</code></dd><dt>Razorpay payment</dt><dd><code>${esc(o.razorpayPaymentId ?? "—")}</code></dd><dt>Amount</dt><dd>${inr(o.amount)} ${esc(o.currency)}</dd><dt>Status</dt><dd>${badge(o.status)}</dd><dt>Created</dt><dd>${ist(o.createdAt)}</dd><dt>Paid</dt><dd>${ist(o.paidAt)}</dd><dt>Refund</dt><dd>${o.status === "refunded" ? "Refunded (from Razorpay refund webhook)" : "None"}</dd><dt>Verification</dt><dd class="m">Paid status is only set after the Razorpay signature and a captured payment are verified on the server (checkout verify or signed webhook).</dd></dl></section>
+<section class="card"><h2>Payment</h2><dl class="kv"><dt>Order ID</dt><dd><code>${esc(o.id)}</code>${testTag(o)}</dd><dt>Razorpay order</dt><dd><code>${esc(o.razorpayOrderId)}</code></dd><dt>Razorpay payment</dt><dd><code>${esc(o.razorpayPaymentId ?? "—")}</code></dd><dt>Amount</dt><dd>${inr(o.amount)} ${esc(o.currency)}</dd><dt>Status</dt><dd>${badge(o.status)}</dd><dt>Created</dt><dd>${ist(o.createdAt)}</dd><dt>Paid</dt><dd>${ist(o.paidAt)}</dd><dt>Verification</dt><dd class="m">Paid status is only set after the Razorpay signature and a captured payment are verified on the server (checkout verify or signed webhook).</dd></dl></section>
 <section class="card"><h2>Email delivery</h2><dl class="kv"><dt>Customer email</dt><dd>${badge(o.emailStatus)} · ${o.emailAttempts} attempt(s)${o.emailSentAt ? ` · sent ${ist(o.emailSentAt)}` : ""}</dd>${o.lastEmailError ? `<dt>Last error</dt><dd class="m">${esc(o.lastEmailError)}</dd>` : ""}<dt>Owner notification</dt><dd>${badge(o.ownerEmailStatus)} · ${o.ownerEmailAttempts} attempt(s)${o.ownerEmailSentAt ? ` · sent ${ist(o.ownerEmailSentAt)}` : ""}</dd>${o.lastOwnerEmailError ? `<dt>Last error</dt><dd class="m">${esc(o.lastOwnerEmailError)}</dd>` : ""}</dl>
 ${canRetry ? `<form method="post" class="f" style="margin-top:14px"><input type="hidden" name="action" value="retry"><input type="hidden" name="id" value="${esc(o.id)}"><label class="check"><input type="checkbox" name="confirm" value="yes" required> Retry the pending email(s) for this one order</label><button class="btn p" type="submit">Retry email</button></form>` : ""}</section>
 <section class="card"><h2>Downloads &amp; access</h2><dl class="kv"><dt>Access</dt><dd>${access}</dd><dt>Total downloads</dt><dd>${o.downloadCount}</dd><dt>Today</dt><dd>${o.downloadDay === new Date().toISOString().slice(0, 10) ? o.downloadsToday : 0}</dd><dt>Last download</dt><dd>${ist(o.lastDownloadAt)}</dd></dl></section>
@@ -249,8 +250,8 @@ async function paymentsView(orders: Order[]) {
   return `<div class="cols"><section class="card"><h2>Razorpay</h2><dl class="kv"><dt>Mode</dt><dd>${mode === "live" ? badge("failed").replace("failed", "LIVE") : mode === "test" ? '<span class="b warn">TEST MODE</span>' : "—"}</dd><dt>Key ID</dt><dd>${keyId ? "configured" : "missing"}</dd><dt>Webhook secret</dt><dd>${webhookSecret ? "configured · signatures verified on the raw body" : "missing"}</dd><dt>Price</dt><dd>${inr(PRODUCT.amount)} ${PRODUCT.currency}, fixed on the server</dd></dl></section>
 <section class="card"><h2>Recent verified webhooks</h2><p class="sub">Only events with a valid signature are stored; each event ID is processed once.</p>${evError ? `<p class="note bad">${esc(evError)}</p>` : events.length ? `<div class="tw"><table><thead><tr><th>Event</th><th>Received (IST)</th><th>ID</th></tr></thead><tbody>${events.map((e) => `<tr><td>${esc(e.type)}</td><td class="nw">${ist(e.receivedAt)}</td><td><code>${esc(e.eventId.slice(0, 18))}…</code></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No webhooks received yet.</div>`}</section></div>
 <section class="card"><h2>Payments</h2><p class="sub">Latest 50 orders. There is deliberately no "mark as paid" control.</p>
-<div class="tw">${rows.length ? `<table><thead><tr><th>Order</th><th>Razorpay order</th><th>Payment ID</th><th class="r">Amount</th><th>Status</th><th>Refund</th><th>Paid (IST)</th></tr></thead><tbody>${rows
-    .map((o) => `<tr><td><a href="/admin/orders?view=orders&amp;id=${esc(o.id)}"><code>${esc(o.id)}</code></a></td><td><code>${esc(o.razorpayOrderId)}</code></td><td><code>${esc(o.razorpayPaymentId ?? "—")}</code></td><td class="r nw">${inr(o.amount)}</td><td>${badge(o.status)}</td><td>${o.status === "refunded" ? badge("refunded") : '<span class="m">—</span>'}</td><td class="nw">${ist(o.paidAt)}</td></tr>`)
+<div class="tw">${rows.length ? `<table><thead><tr><th>Order</th><th>Razorpay order</th><th>Payment ID</th><th class="r">Amount</th><th>Status</th><th>Paid (IST)</th></tr></thead><tbody>${rows
+    .map((o) => `<tr><td><a href="/admin/orders?view=orders&amp;id=${esc(o.id)}"><code>${esc(o.id)}</code></a></td><td><code>${esc(o.razorpayOrderId)}</code></td><td><code>${esc(o.razorpayPaymentId ?? "—")}</code></td><td class="r nw">${inr(o.amount)}</td><td>${badge(o.status)}</td><td class="nw">${ist(o.paidAt)}</td></tr>`)
     .join("")}</tbody></table>` : `<div class="empty">No payments yet.</div>`}</div></section>`;
 }
 
@@ -261,7 +262,7 @@ async function ebookView(orders: Order[], check: boolean) {
   const paid = orders.filter((o) => o.status === "paid").length;
   const today = new Date().toISOString().slice(0, 10);
   const yn = (v: boolean | null, yes: string, no: string) => (v === null ? '<span class="m">—</span>' : v ? `<span class="b ok">${yes}</span>` : `<span class="b bad">${no}</span>`);
-  return `<div class="cols"><section class="card"><h2>Ebook</h2><dl class="kv"><dt>Title</dt><dd>${esc(PRODUCT.name)}</dd><dt>File</dt><dd><code>${esc(ebookStoragePath())}</code></dd><dt>Bucket</dt><dd><code>${esc(ebookBucket())}</code> (${esc(storageDriver())})</dd><dt>Delivery</dt><dd>Signed URLs, valid 15 minutes, created per click after a server-side paid check. Paid buyers can download as often as they need; refunds revoke access. No permanent URL exists.</dd></dl></section>
+  return `<div class="cols"><section class="card"><h2>Ebook</h2><dl class="kv"><dt>Title</dt><dd>${esc(PRODUCT.name)}</dd><dt>File</dt><dd><code>${esc(ebookStoragePath())}</code></dd><dt>Bucket</dt><dd><code>${esc(ebookBucket())}</code> (${esc(storageDriver())})</dd><dt>Delivery</dt><dd>Signed URLs, valid 15 minutes, created per click after a server-side paid check. Paid buyers can download as often as they need. No permanent URL exists.</dd></dl></section>
 <section class="card"><h2>Storage status</h2>${s
     ? `${s.ok ? '<p class="note ok">Storage verified: private and the ebook is present.</p>' : `<p class="note bad">Storage problem: ${esc(s.error ?? "see details")}</p>`}<dl class="kv"><dt>Bucket private</dt><dd>${yn(s.bucketPrivate, "private", "PUBLIC")}</dd><dt>Public URL blocked</dt><dd>${yn(s.publicAccessBlocked, "blocked", "OPEN")}</dd><dt>Ebook object</dt><dd>${s.size ? `present · ${(s.size / 1048576).toFixed(2)} MB` : '<span class="b bad">missing</span>'}</dd><dt>Type</dt><dd>${esc(s.mime ?? "—")}</dd><dt>Allowed types</dt><dd>${esc(s.allowedMime ?? "—")}</dd><dt>Size limit</dt><dd>${s.sizeLimit ? `${(s.sizeLimit / 1048576).toFixed(0)} MB` : "—"}</dd></dl>`
     : `<p class="sub">Checks the bucket and file on demand. The private URL is never shown.</p>`}

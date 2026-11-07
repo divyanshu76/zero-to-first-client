@@ -2,6 +2,7 @@ import "server-only";
 import { PRODUCT, emailDriver, resendApiBase, resendConfig, supportEmail } from "./config";
 import { BRAND_LOGO } from "./brand-logo";
 import { LOGO_CID, logoAttachment, outbox } from "./email";
+import { pricing } from "@/data/product";
 
 /**
  * Checkout reminder (opt-in only). Deliberately non-promotional: it names the unfinished checkout,
@@ -79,7 +80,135 @@ const copy = {
   },
 };
 
+/* ── Reminder 2 of 2: a fuller, more polished email (reminder 1 is unchanged) ── */
+
+/** Show the launch price against the regular price only while the site itself says so. */
+const launchOffer = () => {
+  const inr = pricing.INR;
+  return inr.amount === PRODUCT.amount / 100 && inr.compareAt && inr.compareAt > inr.amount ? { now: inr.amount, was: inr.compareAt } : null;
+};
+
+const second = {
+  en: {
+    subject: "Your copy of Zero to First Client is ready when you are",
+    preheader: "Your checkout details are saved. Pick up where you left off.",
+    badge: "Your checkout is saved",
+    title: "Pick up where you left off",
+    hello: (n: string) => (n ? `Hi ${n},` : "Hi,"),
+    intro: "You recently started checkout for ZERO TO FIRST CLIENT but didn't finish, so you haven't been charged. Your details are saved: the button below takes you back with them filled in, and you only need to review and pay.",
+    insideTitle: "What's inside",
+    stats: [["142", "page PDF"], ["10", "chapters"], ["141", "AI prompts"], ["20", "templates"], ["7", "calculator sheets"], ["24", "diagrams"]] as [string, string][],
+    missingTitle: "What you'd be missing",
+    missing: [
+      "A step-by-step path from choosing a service to winning your first paying client",
+      "Ready-to-use AI prompts and message scripts in English or Roman Hinglish",
+      "Templates and calculator sheets you can put to work straight away",
+      "Clear Hindi explanations with the English business terms you'll actually use",
+    ],
+    priceLabel: "Launch price",
+    regular: (n: number) => `regular ₹${n}`,
+    priceNote: "One-time payment. Instant download after your payment is verified.",
+    cta: "Complete Your Purchase",
+    secure: "Secure payment by Razorpay. We never see your card or UPI details.",
+    ignore: "If you've already bought it or changed your mind, just ignore this email. This is reminder 2 of 2: you won't get more about this checkout.",
+    support: (s: string) => `Questions? Reply to this email or write to ${s}.`,
+    supportNoEmail: "Questions? Use the contact page on craftandcode.tech.",
+    team: "The CRAFT & CODE team",
+    why: "You're receiving this because you chose to get reminders about this checkout when you started it on craftandcode.tech.",
+    unsubscribe: "Unsubscribe from checkout reminders",
+  },
+  hi: {
+    subject: "Zero to First Client की आपकी copy आपका इंतज़ार कर रही है",
+    preheader: "आपकी checkout details saved हैं। जहाँ छोड़ा था, वहीं से आगे बढ़ें।",
+    badge: "आपका checkout saved है",
+    title: "जहाँ छोड़ा था, वहीं से आगे बढ़ें",
+    hello: (n: string) => (n ? `नमस्ते ${n},` : "नमस्ते,"),
+    intro: "आपने हाल ही में ZERO TO FIRST CLIENT का checkout शुरू किया था, पर पूरा नहीं हुआ, इसलिए आपसे कोई पैसा नहीं लिया गया। आपकी details saved हैं: नीचे का button आपको भरी हुई details के साथ वापस ले जाएगा, आपको बस जाँचकर pay करना है।",
+    insideTitle: "अंदर क्या है",
+    stats: [["142", "पेज की PDF"], ["10", "chapters"], ["141", "AI prompts"], ["20", "templates"], ["7", "calculator sheets"], ["24", "diagrams"]] as [string, string][],
+    missingTitle: "आप क्या miss करेंगे",
+    missing: [
+      "Service चुनने से लेकर पहला paying client पाने तक का step-by-step रास्ता",
+      "English या Roman Hinglish में तैयार AI prompts और message scripts",
+      "Templates और calculator sheets, जिन्हें आप तुरंत इस्तेमाल कर सकते हैं",
+      "आसान Hindi explanations, उन English business terms के साथ जो आप सच में इस्तेमाल करेंगे",
+    ],
+    priceLabel: "Launch price",
+    regular: (n: number) => `regular ₹${n}`,
+    priceNote: "एक बार का payment। Payment verify होते ही तुरंत download।",
+    cta: "अपनी ख़रीद पूरी करें",
+    secure: "Razorpay से सुरक्षित payment। हम आपके card या UPI details न देखते हैं, न रखते हैं।",
+    ignore: "अगर आप इसे ख़रीद चुके हैं या आपका मन बदल गया है, तो इस email को नज़रअंदाज़ कर दें। यह 2 में से reminder 2 है: इस checkout के बारे में और emails नहीं आएँगे।",
+    support: (s: string) => `कोई सवाल? इस email का जवाब दें या ${s} पर लिखें।`,
+    supportNoEmail: "कोई सवाल? craftandcode.tech का contact page इस्तेमाल करें।",
+    team: "CRAFT & CODE team",
+    why: "यह email आपको इसलिए मिला क्योंकि craftandcode.tech पर checkout शुरू करते समय आपने इस checkout के reminders पाना चुना था।",
+    unsubscribe: "Checkout reminders से unsubscribe करें",
+  },
+};
+
+export function renderSecondReminder(e: ReminderEmail) {
+  const c = second[e.locale];
+  const support = supportEmail();
+  const name = firstName(e.name);
+  const offer = launchOffer();
+  const font = e.locale === "hi" ? "'Noto Sans Devanagari','Mangal',Arial,sans-serif" : "-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+  const priceText = offer ? `${c.priceLabel}: ₹${offer.now} (${c.regular(offer.was)})` : `₹${PRODUCT.amount / 100}`;
+  const text = [
+    c.hello(name), "", c.intro, "",
+    `${c.insideTitle}:`, ...c.stats.map(([n, l]) => `• ${n} ${l}`), "",
+    `${c.missingTitle}:`, ...c.missing.map((m) => `• ${m}`), "",
+    priceText, c.priceNote, "",
+    `${c.cta}: ${e.continueUrl}`, c.secure, "",
+    c.ignore, "",
+    support ? c.support(support) : c.supportNoEmail, c.team, "craftandcode.tech", "",
+    c.why, `${c.unsubscribe}: ${e.unsubscribeUrl}`,
+  ].join("\n");
+
+  const statCell = ([n, l]: [string, string]) =>
+    `<td width="33%" style="padding:6px"><div style="background:#ffffff;border:1px solid #e8e5ed;border-radius:14px;padding:14px 8px;text-align:center"><div style="font-size:24px;line-height:1.1;font-weight:800;color:#6d28d9">${esc(n)}</div><div style="margin-top:4px;font-size:12px;line-height:1.3;color:#3a3840">${esc(l)}</div></div></td>`;
+  const button = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:22px auto 8px"><tr><td style="background:#6d28d9;border-radius:999px;box-shadow:0 8px 20px -10px rgba(109,40,217,.7)"><a href="${esc(e.continueUrl)}" style="display:inline-block;padding:15px 26px;color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;letter-spacing:.01em;white-space:nowrap">${esc(c.cta)} →</a></td></tr></table>`;
+  const html = `<!doctype html>
+<html lang="${e.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(c.subject)}</title></head>
+<body style="margin:0;padding:0;background:#f1efe9;font-family:${font};color:#111113;-webkit-text-size-adjust:100%">
+<div style="display:none;max-height:0;overflow:hidden">${esc(c.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1efe9"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #e8e5ed">
+<tr><td style="padding:22px 28px;background:#0f0b1a"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
+${BRAND_LOGO ? `<td style="padding-right:14px;vertical-align:middle"><img src="cid:${LOGO_CID}" width="48" height="48" alt="CRAFT &amp; CODE" style="display:block;border:0;border-radius:12px"></td>` : ""}
+<td style="vertical-align:middle"><div style="font-size:16px;letter-spacing:.08em;font-weight:800;color:#ffffff">CRAFT <span style="color:#a78bfa">&amp;</span> CODE</div><div style="margin-top:3px;font-size:12px;color:#c4b5fd">ZERO TO FIRST CLIENT · 2026 Edition</div></td>
+</tr></table></td></tr>
+<tr><td style="padding:30px 28px 8px">
+<div style="display:inline-block;background:#ede7fb;color:#5b21b6;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px">✓ ${esc(c.badge)}</div>
+<h1 style="margin:16px 0 0;font-size:26px;line-height:1.25;font-weight:800;color:#111113">${esc(c.title)}</h1>
+<p style="margin:16px 0 0;font-size:16px;line-height:1.6">${esc(c.hello(name))}</p>
+<p style="margin:8px 0 0;font-size:15px;line-height:1.7;color:#3a3840">${esc(c.intro)}</p>
+${button}
+</td></tr>
+<tr><td style="padding:18px 22px 6px"><div style="font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6b6872;padding:0 6px 6px">${esc(c.insideTitle)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf9f6;border-radius:18px;padding:6px">
+<tr>${c.stats.slice(0, 3).map(statCell).join("")}</tr><tr>${c.stats.slice(3).map(statCell).join("")}</tr></table></td></tr>
+<tr><td style="padding:20px 28px 4px"><div style="font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6b6872">${esc(c.missingTitle)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px">${c.missing.map((m) => `<tr><td width="26" style="vertical-align:top;padding:6px 0;color:#6d28d9;font-weight:800">✓</td><td style="padding:6px 0;font-size:14px;line-height:1.6;color:#111113">${esc(m)}</td></tr>`).join("")}</table></td></tr>
+<tr><td style="padding:20px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ddd6fe;border-radius:18px;background:#f5f3ff"><tr><td style="padding:18px 20px">
+<div style="font-size:15px;font-weight:800;color:#111113">${esc(PRODUCT.name)}</div>
+<div style="margin-top:10px">${offer ? `<span style="font-size:13px;color:#5b21b6;font-weight:700">${esc(c.priceLabel)}</span> <span style="font-size:28px;font-weight:800;color:#111113">₹${offer.now}</span> <span style="font-size:15px;color:#6b6872;text-decoration:line-through">₹${offer.was}</span>` : `<span style="font-size:28px;font-weight:800;color:#111113">₹${PRODUCT.amount / 100}</span>`}</div>
+<div style="margin-top:6px;font-size:13px;line-height:1.5;color:#3a3840">${esc(c.priceNote)}</div>
+${button}
+<div style="text-align:center;font-size:12px;line-height:1.5;color:#6b6872">🔒 ${esc(c.secure)}</div>
+</td></tr></table></td></tr>
+<tr><td style="padding:4px 28px 26px">
+<p style="margin:0;font-size:13px;line-height:1.6;color:#6b6872">${esc(c.ignore)}</p>
+<p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#3a3840">${support ? esc(c.support(support)).replace(esc(support), `<a href="mailto:${esc(support)}" style="color:#6d28d9;font-weight:600">${esc(support)}</a>`) : esc(c.supportNoEmail)}</p>
+<p style="margin:16px 0 0;font-size:14px;line-height:1.6"><strong>${esc(c.team)}</strong><br><a href="https://craftandcode.tech" style="color:#6d28d9">craftandcode.tech</a></p>
+</td></tr>
+<tr><td style="padding:18px 28px;background:#faf9f6;border-top:1px solid #e8e5ed;font-size:11px;line-height:1.6;color:#6b6872">${esc(c.why)}<br><a href="${esc(e.unsubscribeUrl)}" style="color:#6b6872;text-decoration:underline">${esc(c.unsubscribe)}</a></td></tr>
+</table></td></tr></table></body></html>`;
+  return { subject: c.subject, text, html };
+}
+
 export function renderReminderEmail(e: ReminderEmail) {
+  if (e.sequence === 2) return renderSecondReminder(e); // reminder 1 (below) is unchanged
   const c = copy[e.locale];
   const support = supportEmail();
   const name = firstName(e.name);

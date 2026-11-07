@@ -71,7 +71,9 @@ async function run(at: number, headers: Record<string, string> = signed()): Prom
 }
 type Mail = { subject: string; text: string; html: string; key: string; headers: Record<string, string> | null };
 const emailsTo = async (email: string) => (await (await mock.get(`/__control/emails?to=${encodeURIComponent(email)}`)).json()) as Mail[];
-const reminders = async (email: string) => (await emailsTo(email)).filter((m) => m.subject.startsWith("Still interested"));
+/** Reminder emails (1st: "Still interested…", 2nd: its own premium design and subject). */
+const REMINDER_SUBJECTS = ["Still interested in Zero to First Client? 🚀", "Your copy of Zero to First Client is ready when you are"];
+const reminders = async (email: string) => (await emailsTo(email)).filter((m) => REMINDER_SUBJECTS.includes(m.subject));
 const deliveries = async (email: string) => (await emailsTo(email)).filter((m) => m.subject.includes("purchase is confirmed"));
 const adminPost = (form: Record<string, string>, at?: number) => api.post("/admin/recovery", { headers: { ...auth(), ...(at ? { "x-recovery-test-now": String(at) } : {}) }, form });
 async function setPayment(razorpayOrderId: string, status: string, id = `pay_${rid()}${rid()}`) {
@@ -242,8 +244,11 @@ test("9. WhatsApp is manual: a pre-filled wa.me link for opted-in customers only
   expect(res.status()).toBe(303);
   const loc = res.headers()["location"];
   expect(loc.startsWith("https://wa.me/919000000001?text=")).toBe(true);
-  expect(decodeURIComponent(loc.split("?text=")[1])).toBe(
-    "Hi! You recently started checkout for ZERO TO FIRST CLIENT by CRAFT & CODE. Your checkout wasn't completed. If you're still interested, you can continue here: https://craftandcode.tech\n\nNeed any help? Just reply to this message.",
+  const text = decodeURIComponent(loc.split("?text=")[1]);
+  const link = /http:\/\/localhost:3301\/#resume=[A-Za-z0-9_-]{43}/.exec(text)?.[0] ?? "";
+  expect(link).not.toBe(""); // a personalized "Continue checkout" link, not the homepage
+  expect(text).toBe(
+    `Hi! You recently started checkout for ZERO TO FIRST CLIENT by CRAFT & CODE, but your purchase wasn't completed.\n\nYour checkout details are saved securely. Continue where you left off and complete your purchase here:\n${link}\n\nNeed help? Simply reply to this message.`,
   );
   // Once per address: a day after it was first opened, the link is gone.
   expect((await open({ "sec-fetch-site": "same-origin" }, Date.now() + 25 * HOUR)).status()).toBe(404);
@@ -713,4 +718,62 @@ test("33. paid customers show Paid on both channels; stops are re-checked right 
   expect(res).toContain("0 sent");
   expect(res).toContain("email stop request recorded");
   expect(await reminders(o.email)).toHaveLength(0);
+});
+
+test("34. the WhatsApp link restores the checkout like the email link, and is refused when expired, invalid or paid", async ({ page }) => {
+  test.setTimeout(90_000);
+  const o = await order("wa-resume", { whatsapp: true });
+  const at = o.t0 + 20 * MIN;
+  const open = () => api.get(`/admin/recovery?whatsapp=${o.orderId}`, { headers: { ...auth(), "sec-fetch-site": "same-origin", "x-recovery-test-now": String(at) }, maxRedirects: 0 });
+  const tokenOf = async () => {
+    const loc = (await open()).headers()["location"] ?? "";
+    return /#resume=([A-Za-z0-9_-]{43})/.exec(decodeURIComponent(loc.split("?text=")[1] ?? ""))?.[1] ?? "";
+  };
+  const token = await tokenOf();
+  expect(token).not.toBe("");
+  expect(await tokenOf()).toBe(token); // reopening the chat gives the same personal link
+  const resume = (t: string, h: Record<string, string> = {}) => api.post("/api/recovery/resume", { data: { token: t }, headers: h });
+  const r = await resume(token);
+  expect(r.status()).toBe(200);
+  expect(await r.json()).toEqual({ name: "Asha Verma", email: o.email, phone: MOBILE }); // only this customer's own details
+  // A checkout whose payment window was closed can still be resumed (that's the point).
+  await api.post("/api/checkout/cancel", { data: { orderId: o.orderId, razorpayOrderId: o.razorpayOrderId } });
+  expect((await resume(token)).status()).toBe(200);
+  expect((await resume(token, { "x-recovery-test-now": String(Date.now() + 8 * 24 * HOUR) })).status()).toBe(404); // expired after 7 days
+  expect((await resume("d".repeat(43))).status()).toBe(404); // unknown token
+
+  // In the browser, the link opens checkout with the details filled in.
+  await page.setExtraHTTPHeaders({ "x-forwarded-for": ip() });
+  await page.goto(`${COMMERCE_URL}/#resume=${token}`, { waitUntil: "domcontentloaded" });
+  const dialog = page.getByTestId("checkout-dialog");
+  await expect(dialog).toBeVisible({ timeout: 20000 });
+  await expect(dialog.getByTestId("resume-note")).toContainText("Welcome back");
+  await expect(dialog.locator('input[name="name"]')).toHaveValue("Asha Verma");
+  await expect(dialog.locator('input[name="email"]')).toHaveValue(o.email);
+  await expect(dialog.locator('input[name="phone"]')).toHaveValue(MOBILE);
+
+  // Paying creates a fresh ₹599 order (the old Razorpay order is never reused); afterwards the
+  // link stops working and no further WhatsApp follow-up is offered.
+  const fresh = await order("wa-resume", { email: false }, { email: o.email, resumeToken: token });
+  expect(fresh.razorpayOrderId).not.toBe(o.razorpayOrderId);
+  await payAndVerify(fresh);
+  expect((await resume(token)).status()).toBe(404);
+  expect((await open()).status()).toBe(404);
+});
+
+test("35. the 2nd reminder has its own premium design; the 1st is unchanged", async () => {
+  const o = await order("second");
+  await run(o.t0 + 31 * MIN);
+  await run(o.t0 + 24 * HOUR + MIN);
+  const [first, second] = await reminders(o.email);
+  expect(first.subject).toBe("Still interested in Zero to First Client? 🚀");
+  expect(first.text).toContain("reminder 1 of 2");
+  expect(second.subject).toBe("Your copy of Zero to First Client is ready when you are");
+  for (const s of ["• 142 page PDF", "• 10 chapters", "• 141 AI prompts", "• 20 templates", "• 7 calculator sheets", "• 24 diagrams", "Launch price: ₹599 (regular ₹999)", "reminder 2 of 2", "Complete Your Purchase:"]) expect(second.text).toContain(s);
+  expect(second.html).toContain("Complete Your Purchase →");
+  expect(second.html).toMatch(/href="http:\/\/localhost:3301\/#resume=[A-Za-z0-9_-]{43}"/);
+  expect(second.text).not.toMatch(/guarantee|hurry|last chance|only today|act now|expires/i);
+  expect(second.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+  const token = resumeToken(second.text);
+  expect((await api.post("/api/recovery/resume", { data: { token } })).status()).toBe(200); // the button's link works
 });

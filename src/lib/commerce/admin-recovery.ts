@@ -4,7 +4,7 @@ import { PRODUCT, adminCredentials, razorpayKeys, recoveryClockOverrideAllowed }
 import { safeEqualHex } from "./razorpay";
 import { badge, esc, inr, isTestOrder, ist, istDate, stat, testTag } from "./admin-ui";
 import { cleanEmail } from "./http";
-import { ADMIN_CONSENT, CONSENT_SOURCES, RULES, STOPPED_EVERYWHERE, emailHash, isUnpaid, logWhatsappOpened, recoveryDashboard, runRecovery, sendManualReminders, whatsappUrl, type ChannelVerdict, type RecoveryRow, type SendOutcome } from "./recovery";
+import { ADMIN_CONSENT, CONSENT_SOURCES, RULES, STOPPED_EVERYWHERE, emailHash, isUnpaid, logWhatsappOpened, recoveryDashboard, runRecovery, sendManualReminders, whatsappRecoveryUrl, whatsappUrl, type ChannelVerdict, type RecoveryRow, type SendOutcome } from "./recovery";
 import { renderReminderEmail } from "./recovery-email";
 import { getStore, type Channel, type ConsentSource, type Order, type RecoveryMessage, type RecoveryRun, type RecoverySettings } from "./store";
 
@@ -207,7 +207,9 @@ export async function recoveryView(u: URL, orders: Order[], now = Date.now()) {
   const pending = real.filter((r) => r.order.status !== "processing");
   const eligible = real.filter((r) => r.a.bucket === "eligible");
   const eligibleEmails = new Set(eligible.map((r) => r.order.customerEmail));
-  const emailMsgs = messages.filter((m) => m.channel === "email");
+  // Every metric uses the same population: real orders (Test Mode orders are excluded on the live store).
+  const realIds = new Set(orders.filter((o) => includeTest() || !isTestOrder(o)).map((o) => o.id));
+  const emailMsgs = messages.filter((m) => m.channel === "email" && realIds.has(m.orderId));
   const remindedEmails = new Set(emailMsgs.filter((m) => m.status === "sent").map((m) => orders.find((o) => o.id === m.orderId)?.customerEmail).filter(Boolean));
   const recoveredReal = recovered.filter((o) => includeTest() || !isTestOrder(o));
   const rate = remindedEmails.size ? `${Math.round((recoveredReal.length / remindedEmails.size) * 100)}%` : "—";
@@ -389,11 +391,13 @@ export async function recoveryWhatsapp(request: Request, id: string, orders: Ord
   if (!/^ord_[a-f0-9]{24}$/.test(id)) return notFound("Unknown order.");
   const { rows } = await recoveryDashboard(orders, now);
   const row = rows.find((r) => r.order.id === id);
-  const url = row?.a.whatsapp ? whatsappUrl(row.order.customerPhone) : null;
-  if (!row || !url) return notFound("WhatsApp isn't available for this checkout (no WhatsApp consent, already followed up, paid, or not eligible).");
+  if (!row || !row.a.whatsapp || !whatsappUrl(row.order.customerPhone)) return notFound("WhatsApp isn't available for this checkout (no WhatsApp consent, already followed up, paid, or not eligible).");
   // Re-check the stop list right before opening the chat (fail closed if it can't be read).
   const stops = await getStore().getStops(emailHash(row.order.customerEmail)).catch(() => STOPPED_EVERYWHERE);
   if (stops.all || stops.whatsapp) return notFound("This customer asked not to be contacted on WhatsApp.");
+  // Personalized "Continue checkout" link (secure resume token), created only now, at the admin's click.
+  const url = await whatsappRecoveryUrl(row.order, now);
+  if (!url) return notFound("No valid mobile number for this checkout.");
   await logWhatsappOpened(row.order).catch((e) => console.error(`[recovery] whatsapp log failed: ${(e as Error).message}`));
   return new Response(null, { status: 303, headers: { location: url, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }

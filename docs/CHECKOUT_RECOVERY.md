@@ -67,6 +67,17 @@ keeps an append-only `consent_records` row with the admin's name. Stop requests 
 (`email_suppressions`, all channels) or per channel (`channel_suppressions`); the email unsubscribe
 link always stops all channels, as the Privacy Policy promises.
 
+Personal links in both channels: the email's "Continue checkout" button and the manual WhatsApp
+message carry the same kind of resume link (/#resume=<token>). It pre-fills name, email and mobile,
+works for 7 days, and stops working once anything is bought with that email. Paying always creates a
+fresh ₹599 order linked to the old one. The WhatsApp link is created only when the admin clicks the
+WhatsApp button; reopening the chat for the same checkout gives the same link.
+
+Email design: reminder 1 is the short "Still interested" email. Reminder 2 (the 24-hour one, or a
+manual send that is the second for that checkout) uses a fuller design: saved-details message, the six
+content figures, what the buyer would be missing, the launch price against the site's regular price
+(only while the site shows it), and a "Complete Your Purchase" button with the personal link.
+
 Stopping: an unsubscribe (link or one-click) or a "stop" request recorded by the admin in
 `/admin/recovery` ("Record a stop request") blocks **every** channel for that address: no reminder
 emails and no WhatsApp follow-up. Only a SHA-256 hash of the address is stored.

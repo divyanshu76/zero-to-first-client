@@ -70,13 +70,26 @@ const istDay = (t: number) => new Date(t).toLocaleDateString("en-CA", { timeZone
 
 /* ── WhatsApp (manual only: the admin reviews and presses Send in WhatsApp) ── */
 
-export const WHATSAPP_MESSAGE =
-  "Hi! You recently started checkout for ZERO TO FIRST CLIENT by CRAFT & CODE. Your checkout wasn't completed. If you're still interested, you can continue here: https://craftandcode.tech\n\nNeed any help? Just reply to this message.";
+/** The pre-filled WhatsApp text, with the customer's own "Continue checkout" link. */
+export const whatsappMessage = (link: string) =>
+  `Hi! You recently started checkout for ZERO TO FIRST CLIENT by CRAFT & CODE, but your purchase wasn't completed.\n\nYour checkout details are saved securely. Continue where you left off and complete your purchase here:\n${link}\n\nNeed help? Simply reply to this message.`;
 
-/** wa.me click-to-chat link for a stored +91 mobile number, or null when the number isn't valid. */
-export function whatsappUrl(phone: string | null) {
+/** wa.me click-to-chat link for a stored +91 mobile number (null when the number isn't valid). */
+export function whatsappUrl(phone: string | null, text = whatsappMessage("https://craftandcode.tech")) {
   const m = /^\+91([6-9]\d{9})$/.exec(phone ?? "");
-  return m ? `https://wa.me/91${m[1]}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}` : null;
+  return m ? `https://wa.me/91${m[1]}?text=${encodeURIComponent(text)}` : null;
+}
+
+/**
+ * The WhatsApp link the admin opens: the same secure resume mechanism as the email. The token is
+ * stored only as a hash, lasts 7 days, works only while nothing has been bought with that email,
+ * and pre-fills name, email and mobile; paying always creates a fresh ₹599 order. With the
+ * recovery secret configured, reopening the chat for the same checkout gives the same link.
+ */
+export async function whatsappRecoveryUrl(order: Order, now = Date.now()) {
+  const token = await issueToken(order.id, "resume", RULES.RESUME_TTL, now, `wa-${order.id}`);
+  const link = `${appOrigin()}${order.locale === "hi" ? "/hi" : ""}/#resume=${token}`;
+  return whatsappUrl(order.customerPhone, whatsappMessage(link));
 }
 
 /* ── Eligibility ───────────────────────────────────────────────────────── */
@@ -267,16 +280,16 @@ async function issueToken(orderId: string, purpose: "resume" | "unsubscribe", tt
   }
   return token;
 }
-async function findToken(token: unknown, purpose: "resume" | "unsubscribe") {
+async function findToken(token: unknown, purpose: "resume" | "unsubscribe", now = Date.now()) {
   if (typeof token !== "string" || !TOKEN_RE.test(token)) return null;
   const t = await getStore().findRecoveryToken(sha256(token));
-  if (!t || t.purpose !== purpose || Date.parse(t.expiresAt) < Date.now()) return null;
+  if (!t || t.purpose !== purpose || Date.parse(t.expiresAt) < now) return null;
   return getStore().getOrder(t.orderId);
 }
 
 /** "Continue checkout": the customer's details for prefilling, only while nothing has been bought. */
-export async function resolveResumeToken(token: unknown) {
-  const order = await findToken(token, "resume");
+export async function resolveResumeToken(token: unknown, now = Date.now()) {
+  const order = await findToken(token, "resume", now);
   if (!order || !isUnpaid(order)) return null;
   const others = await getStore().ordersByEmail(order.customerEmail);
   if (others.some((o) => o.status === "paid" || o.status === "refunded")) return null;

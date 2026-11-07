@@ -615,8 +615,15 @@ test.describe("admin", () => {
     const detail = await (await api.get(`/admin/orders?view=orders&id=${body.orderId}`, { headers: auth() })).text();
     for (const s of [body.razorpayOrderId, email, "+919000000001", "pending", "no access"]) expect(detail, s).toContain(s);
     expect(detail).not.toMatch(/mark (as )?paid/i);
-    const filtered = await (await api.get(`/admin/orders?view=orders&status=refunded&q=${body.orderId}`, { headers: auth() })).text();
-    expect(filtered).toContain("0 order(s)");
+    const filtered = await (await api.get(`/admin/orders?view=orders&status=paid&q=${body.orderId}`, { headers: auth() })).text();
+    expect(filtered).toContain("0 order(s)"); // the order is pending, so the paid filter excludes it
+    // No refund workflow exists, so the admin offers no refund filter, column or card.
+    for (const v of ["orders", "payments", "overview"]) {
+      const html = await (await api.get(`/admin/orders?view=${v}`, { headers: auth() })).text();
+      expect(html).not.toContain('<option value="refunded"');
+      expect(html).not.toContain("<th>Refund</th>");
+      expect(html).not.toContain('<div class="k">Refunded</div>');
+    }
     const overview = await (await api.get("/admin/orders", { headers: auth() })).text();
     expect(overview).toContain("TEST");
     expect(overview).toContain("Total orders");

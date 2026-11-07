@@ -1,5 +1,6 @@
 import { badRequest, crossSite, fail, json, readJson, sameOrigin } from "@/lib/commerce/http";
 import { clientIp, rateLimit, tooMany } from "@/lib/commerce/rate-limit";
+import { recoveryClockOverrideAllowed } from "@/lib/commerce/config";
 import { resolveResumeToken } from "@/lib/commerce/recovery";
 
 /**
@@ -15,7 +16,9 @@ export async function POST(request: Request) {
   const body = await readJson(request);
   if (!body || typeof body.token !== "string") return badRequest();
   try {
-    const order = await resolveResumeToken(body.token);
+    // Automated tests only (refused on Vercel and with live keys): check expiry at a later time.
+    const t = recoveryClockOverrideAllowed() ? Number(request.headers.get("x-recovery-test-now")) : NaN;
+    const order = await resolveResumeToken(body.token, Number.isFinite(t) && t > 0 ? t : Date.now());
     if (!order) return fail(404, "link_expired", "This checkout link has expired or is no longer valid.");
     return json({ name: order.customerName, email: order.customerEmail, phone: order.customerPhone?.replace(/^\+91/, "") ?? "" });
   } catch {
